@@ -1,14 +1,11 @@
 package cluster
 
 import (
-	"fmt"
-
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/kubecrtutils/cluster/config"
 	"github.com/mandelsoft/kubecrtutils/types"
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/controller-runtime/pkg/cluster"
 )
 
 const DEFAULT = "default"
@@ -17,89 +14,77 @@ type DefinitionProvider = types.ClusterDefinitionProvider
 
 type Definition = types.ClusterDefinition
 
-type definition struct {
+type baseAttr struct {
 	name     string
 	fallback string
 	rules    config.Rules
 	desc     string
 	scheme   *runtime.Scheme
-	fleet    bool
 }
 
-var _ Definition = (*definition)(nil)
+type baseDef[D Definition] struct {
+	self D
+	baseAttr
+}
 
-func Define(name string, desc string, rule ...config.Rule) Definition {
+func newBase[D Definition](self D, name string, desc string, rule ...config.Rule) baseDef[D] {
 	if len(rule) == 0 {
 		rule = []config.Rule{config.DedicatedConfigRules(name, desc)}
 	}
-	return &definition{name: name, desc: desc, fallback: DEFAULT, rules: config.NewRules(rule...)}
+	return baseDef[D]{self: self, baseAttr: baseAttr{name: name, desc: desc, fallback: DEFAULT, rules: config.NewRules(rule...)}}
 }
 
-func (d *definition) RequireFleet() bool {
-	return d.fleet
-}
-
-func (d *definition) WithFallback(fallback string) Definition {
+func (d *baseDef[D]) WithFallback(fallback string) D {
 	d.fallback = fallback
-	return d
+	return d.self
 }
 
-func (d *definition) WithScheme(scheme *runtime.Scheme) Definition {
+func (d *baseDef[D]) WithScheme(scheme *runtime.Scheme) D {
 	d.scheme = scheme
-	return d
+	return d.self
 }
 
-func (d *definition) GetDefinition() Definition {
-	return d
+////////////////////////////////////////////////////////////////////////////////
+
+func (d *baseDef[D]) GetDefinition() Definition {
+	return d.self
 }
 
-func (d *definition) RequireIdentity() {
+func (d *baseDef[F]) RequireIdentity() {
 	d.rules.RequireIdentity()
 }
 
-func (d *definition) GetName() string {
+func (d *baseDef[D]) GetName() string {
 	return d.name
 }
 
-func (d *definition) GetFallback() string {
+func (d *baseDef[D]) GetFallback() string {
 	return d.fallback
 }
 
-func (d *definition) GetDescription() string {
+func (d *baseDef[D]) GetDescription() string {
 	return d.desc
 }
 
-func (d *definition) GetScheme() *runtime.Scheme {
+func (d *baseDef[D]) GetScheme() *runtime.Scheme {
 	return d.scheme
 }
 
-func (d *definition) GetConfig(o *config.ConfigOptions) (*config.Config, error) {
+func (d *baseDef[D]) GetConfig(o *config.ConfigOptions) (*config.Config, error) {
 	return d.rules.GetConfig(o)
 }
 
-func (d *definition) AddFlags(fs *pflag.FlagSet) {
+func (d *baseDef[D]) AddFlags(fs *pflag.FlagSet) {
 	d.rules.AddFlags(fs)
 }
 
-func (d *definition) AsOptionSet() flagutils.OptionSet {
+func (d *baseDef[D]) AsOptionSet() flagutils.OptionSet {
 	return d.rules.AsOptionSet()
 }
 
-func (d *definition) Create(defs Definitions) (ClusterEquivalent, error) {
-	ropts := &config.ConfigOptions{}
-	cfg, err := d.GetConfig(ropts)
-	if err != nil {
-		return nil, fmt.Errorf("cluster %s: %w", d.name, err)
+func mapBase[I, O Definition](in baseDef[I], o O) baseDef[O] {
+	return baseDef[O]{
+		self:     o,
+		baseAttr: in.baseAttr,
 	}
-	if cfg == nil {
-		return nil, nil
-	}
-	c, err := NewCluster(d.name, cfg, func(opts *cluster.Options) {
-		if d.scheme != nil {
-			opts.Scheme = d.scheme
-		} else {
-			opts.Scheme = defs.GetScheme()
-		}
-	})
-	return c, nil
 }

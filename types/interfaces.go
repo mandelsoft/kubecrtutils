@@ -114,7 +114,6 @@ type ClusterDefinition interface {
 	flagutils.Options
 	flagutils.OptionSetProvider
 
-	RequireFleet() bool
 	RequireIdentity()
 
 	GetConfig(*config.ConfigOptions) (*config.Config, error)
@@ -124,8 +123,8 @@ type ClusterDefinition interface {
 	GetDescription() string
 	GetScheme() *runtime.Scheme
 
-	WithFallback(fallback string) ClusterDefinition
-	WithScheme(scheme *runtime.Scheme) ClusterDefinition
+	// WithFallback(fallback string) ClusterDefinition
+	// WithScheme(scheme *runtime.Scheme) ClusterDefinition
 
 	Create(defs ClusterDefinitions) (ClusterEquivalent, error)
 }
@@ -161,7 +160,7 @@ type Fleet interface {
 
 type FleetType interface {
 	GetType() string
-	Create(defs ClusterDefinitions, definition ClusterDefinition, config config.Config) (Fleet, error)
+	Create(defs ClusterDefinitions, definition ClusterDefinition, config config.Config, log logging.Logger) (Fleet, error)
 	GetRules(def ClusterDefinition) config.Rules
 }
 

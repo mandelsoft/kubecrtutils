@@ -34,20 +34,44 @@ type _cluster struct {
 
 var _ SchemeProvider = (*_cluster)(nil)
 
-func NewClusterForCRTCluster(name string, c cluster.Cluster, id ...string) Cluster {
+func NewClusterForCRTCluster(name string, c cluster.Cluster, opts ...any) Cluster {
+
+	id := name
+	var cl client.Client
 	var conv managedfields.TypeConverter
 
-	if c != nil {
-		var err error
-		conv, err = merge.NewConverterV3(c.GetConfig())
-		if err != nil {
+	for _, o := range opts {
+		if o == nil {
+			continue
+		}
+		switch v := o.(type) {
+		case string:
+			id = v
+		case managedfields.TypeConverter:
+			conv = v
+		case client.Client:
+			cl = v
+		default:
 			return nil
 		}
 	}
+
+	if c != nil {
+		if conv == nil {
+			var err error
+			conv, err = merge.NewConverterV3(c.GetConfig())
+			if err != nil {
+				return nil
+			}
+		}
+		cl = c.GetClient()
+	}
+
 	return &_cluster{
 		Cluster:   c,
+		Client:    cl,
 		name:      name,
-		id:        general.OptionalNonZeroDefaulted(name, id...),
+		id:        id,
 		converter: conv,
 		TypedMux:  enqueue.NewMux(c.GetScheme()),
 		indices:   map[string]Index{},

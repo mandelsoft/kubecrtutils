@@ -120,12 +120,15 @@ func DefaultRules() Rules {
 }
 
 func DedicatedConfigRules(name, desc string, rules ...Rule) Rules {
-	return NewRules(
+	rules = append(slices.Clone(rules),
 		NewIdOption(""),
 		NewContextOption(""),
 		NewKubeconfigOption("", "").WithInClusterMode(),
 		NewEnvironmentVariable(),
-	).Add(rules...).PersonalizedWith(&Personalization{
+	)
+	return NewRules(
+		rules...,
+	).PersonalizedWith(&Personalization{
 		Name:        name,
 		Description: desc,
 	})

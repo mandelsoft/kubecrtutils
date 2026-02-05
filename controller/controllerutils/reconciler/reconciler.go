@@ -177,7 +177,7 @@ func (d *crtReconciler[T]) Reconcile(ctx context.Context, request reconcile.Requ
 		Context:       ctx,
 		Cluster:       cl,
 		EventRecorder: cl.GetEventRecorderFor(d.name),
-		Logger:        d.logger.WithName(request.String()).WithValues("object", request.NamespacedName),
+		Logger:        d.logger.WithName(request.String()).WithValues("object", request.NamespacedName, "cluster", cl.GetName()),
 		Request:       request,
 		After:         d.after,
 	}
@@ -190,6 +190,7 @@ func (d *crtReconciler[T]) Reconcile(ctx context.Context, request reconcile.Requ
 		if errors.IsNotFound(err) {
 			req.Orig = _nil
 			effreq = d.reconciler.Request(&req)
+			effreq.Info("*** reconcile deleted")
 			prob = effreq.ReconcileDeleted()
 		} else {
 			return reconcile.Result{}, err
@@ -198,8 +199,10 @@ func (d *crtReconciler[T]) Reconcile(ctx context.Context, request reconcile.Requ
 		req.Object = req.Orig.DeepCopyObject().(T)
 		effreq = d.reconciler.Request(&req)
 		if effreq.GetObject().GetDeletionTimestamp().IsZero() {
+			effreq.Info("*** reconcile")
 			prob = effreq.Reconcile()
 		} else {
+			effreq.Info("*** reconcile deletion")
 			prob = effreq.ReconcileDeleting()
 		}
 

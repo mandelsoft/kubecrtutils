@@ -12,6 +12,9 @@ type _clusterAlias struct {
 }
 
 func NewAlias(name string, c Cluster) Cluster {
+	if name == c.GetName() {
+		return c
+	}
 	return &_clusterAlias{
 		Cluster: c,
 		name:    name,
@@ -37,6 +40,9 @@ type _fleetAlias struct {
 }
 
 func NewFleetAlias(name string, c Fleet) Fleet {
+	if c.GetName() == name {
+		return c
+	}
 	a := &_fleetAlias{Composer: fpi.NewComposer(name), Fleet: c, clusters: make(map[string]Cluster)}
 	return a
 }
@@ -57,19 +63,26 @@ func (c *_fleetAlias) Strip(name string) string {
 	return c.Composer.Strip(name)
 }
 
+func (c *_fleetAlias) Split(name string) (string, string) {
+	return c.Composer.Split(name)
+}
+
 func (c *_fleetAlias) Unwrap() Fleet {
 	return c.Fleet
 }
 
 func (c *_fleetAlias) GetCluster(name string) Cluster {
 	var f Cluster
-	base := c.Strip(name)
+	base, l := c.Split(name)
+	if c.GetName() != base {
+		return nil
+	}
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	n := c.Fleet.GetCluster(c.Fleet.Compose(base))
+	n := c.Fleet.GetCluster(c.Fleet.Compose(l))
 	if n != nil {
 		f = c.clusters[base]
-		if f == nil {
+		if f == nil || f.GetCluster() != f {
 			f = NewAlias(name, n)
 			c.clusters[base] = f
 		}

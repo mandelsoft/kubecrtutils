@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/mandelsoft/kubecrtutils/cluster/clustercontext"
+	"github.com/mandelsoft/kubecrtutils/cluster/fleet"
 	handler2 "github.com/mandelsoft/kubecrtutils/controller/handler"
-	"github.com/mandelsoft/kubecrtutils/fleet"
 	"github.com/mandelsoft/kubecrtutils/types"
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"

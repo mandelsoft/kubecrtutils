@@ -30,7 +30,7 @@ func NewShadowController[request mcreconcile.ClusterAware[request]](cntr types.C
 		clusters: make(map[string]*engagedCluster),
 	}
 
-	c.watches.Logger = cntr.GetLogger().WithName("watches").V(0)
+	c.watches.Logger = cntr.GetLogger().WithName("watches").V(4)
 	c.Logger.Info("creating shaddow controller for watch sources")
 	// Add as a Manager components
 	return c, cntr.GetControllerManager().GetManager().Add(c)

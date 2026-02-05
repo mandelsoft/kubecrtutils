@@ -24,11 +24,11 @@ var ErrClusterNotOwned = fmt.Errorf("cluster not owned by fleet")
 type Support struct {
 	self types.Fleet
 	Composer
+	id      Composer
 	lock    sync.Mutex
 	typ     types.FleetType
 	indices map[string]types.Index
 	enqueue.TypedMux[mcreconcile.Request]
-	id       string
 	scheme   *runtime.Scheme
 	provider multicluster.Provider
 	base     types.Cluster
@@ -42,7 +42,7 @@ func NewSupport(self types.Fleet, typ types.FleetType, name, id string, scheme *
 		self:     self,
 		Composer: Composer{name},
 		typ:      typ,
-		id:       id,
+		id:       Composer{id},
 		scheme:   scheme,
 		base:     base,
 		provider: provider,
@@ -91,7 +91,7 @@ func (s *Support) GetType() types.FleetType {
 }
 
 func (s *Support) GetId() string {
-	return s.id
+	return s.id.GetName()
 }
 
 func (s *Support) GetBaseCluster() types.Cluster {
