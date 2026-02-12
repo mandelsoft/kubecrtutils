@@ -1,10 +1,9 @@
 package owner
 
 import (
-	"fmt"
-	"strings"
-
+	"github.com/mandelsoft/goutils/funcs"
 	"github.com/mandelsoft/goutils/general"
+	"github.com/mandelsoft/goutils/generics"
 	"github.com/mandelsoft/kubecrtutils/objutils"
 	"github.com/mandelsoft/kubecrtutils/types"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -14,9 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-const DEFAULT_REMOTE_NAME = "cross-cluster.io/owner-id"
-
-type ClusterMatcher func(clusterId string) (clusterName string)
+type ClusterMatcher func(clusterId string) (clusterName string, equal bool)
 
 type Handler interface {
 	SetOwner(cluster types.Cluster, owner client.Object, target types.Cluster, slave client.Object) error
@@ -24,12 +21,20 @@ type Handler interface {
 }
 
 type standard struct {
-	property string
+	annoType AnnotationType
 	scheme   *runtime.Scheme
 }
 
-func NewHandler(scheme *runtime.Scheme, property ...string) Handler {
-	return &standard{property: general.OptionalNonZeroDefaulted(DEFAULT_REMOTE_NAME, property...), scheme: scheme}
+func NewHandler(scheme types.SchemeProvider, annos ...AnnotationType) Handler {
+	return NewHandlerWithScheme(scheme.GetScheme(), annos...)
+}
+
+func NewHandlerWithScheme(scheme *runtime.Scheme, annos ...AnnotationType) Handler {
+	t := general.Optional(annos...)
+	if t == nil {
+		t = StandardAnnotationType
+	}
+	return &standard{annoType: t, scheme: scheme}
 }
 
 func (h *standard) SetOwner(cluster types.Cluster, owner client.Object, target types.Cluster, slave client.Object) error {
@@ -46,17 +51,17 @@ func (h *standard) SetOwner(cluster types.Cluster, owner client.Object, target t
 	if gvk.Group == "" {
 		gvk.Group = "core"
 	}
-	o := fmt.Sprintf("%s/%s/%s/%s", gvk.Group, gvk.Kind, owner.GetNamespace(), owner.GetName())
+	o := h.annoType.CrossNamespaceAnnotation(gvk.Group, gvk.Kind, owner.GetNamespace(), owner.GetName())
 	if cluster != nil && !cluster.IsSameAs(target) {
-		o += "/" + cluster.GetId()
+		o = o.ForCluster(cluster.GetId())
 	}
-	objutils.SetAnnotation(slave, h.property, o)
+	objutils.ModifyAnnotations(slave, o.Put)
 	return nil
 }
 
 func (h *standard) GetOwner(cmatch ClusterMatcher, target types.Cluster, obj client.Object, kind schema.GroupKind) (string, *client.ObjectKey) {
-	cid := cmatch(target.GetId())
-	if cid != "" {
+	eq := funcs.Second(cmatch(target.GetId()))
+	if eq {
 		for _, r := range obj.GetOwnerReferences() {
 			if r.Kind != kind.Kind {
 				continue
@@ -72,27 +77,14 @@ func (h *standard) GetOwner(cmatch ClusterMatcher, target types.Cluster, obj cli
 		kind.Group = "core"
 	}
 
-	// group / kind / namespace / name / cluster
-	a := objutils.GetAnnotation(obj, h.property)
-	if a == "" {
+	// [cluster /] group / kind / namespace / name
+	a, err := h.annoType.Get(obj.GetAnnotations())
+	if a == nil || err != nil {
 		return "", nil
 	}
-	fields := strings.Split(a, "/")
-	cname := h.match(cid, cmatch, fields, kind)
+	cname := a.Match(target.GetId(), cmatch, kind)
 	if cname == "" {
 		return "", nil
 	}
-	return cname, &client.ObjectKey{Namespace: fields[2], Name: fields[3]}
-}
-
-func (l *standard) match(localId string, matcher ClusterMatcher, fields []string, kind schema.GroupKind) (clusterName string) {
-	if fields[0] == kind.Group && fields[1] == kind.Kind {
-		switch len(fields) {
-		case 4:
-			return localId
-		case 5:
-			return matcher(fields[4])
-		}
-	}
-	return ""
+	return cname, generics.PointerTo(a.ObjectKey())
 }

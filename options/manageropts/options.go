@@ -17,6 +17,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	ctrl "sigs.k8s.io/multicluster-runtime"
+	"sigs.k8s.io/multicluster-runtime/providers/clusters"
 	"sigs.k8s.io/multicluster-runtime/providers/multi"
 )
 
@@ -107,12 +108,12 @@ func (o *Options) GetMain() string {
 }
 
 func (o *Options) GetManager(ctx context.Context, opts flagutils.OptionSetProvider) (ctrl.Manager, error) {
-	clusters := cluster.From(opts).GetClusters()
-	if clusters == nil {
+	configuredClusters := cluster.From(opts).GetClusters()
+	if configuredClusters == nil {
 		return nil, fmt.Errorf("no cluster definitions found in options")
 	}
 
-	cl := clusters.Get(o.main)
+	cl := configuredClusters.Get(o.main)
 	if cl == nil {
 		return nil, fmt.Errorf("could not find main cluster %q", o.main)
 	}
@@ -181,11 +182,14 @@ func (o *Options) GetManager(ctx context.Context, opts flagutils.OptionSetProvid
 		}
 	}
 
-	provider := multi.New(multi.Options{Separator: "#", ChannelSize: clusters.Len()})
+	provider := multi.New(multi.Options{Separator: "#", ChannelSize: configuredClusters.Len()})
 	m, err := ctrl.NewManager(main.GetConfig(), provider, cfg)
 	if err != nil {
 		return nil, err
 	}
+
+	clusterprovider := clusters.New()
+	provider.AddProvider("", clusterprovider)
 
 	if err := m.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		return nil, fmt.Errorf("unable to set up health check: %w", err)
@@ -195,7 +199,7 @@ func (o *Options) GetManager(ctx context.Context, opts flagutils.OptionSetProvid
 	}
 
 	found := sets.New[string]()
-	for _, c := range clusters.Elements {
+	for _, c := range configuredClusters.Elements {
 		eff := c.GetEffective()
 		if !found.Has(c.GetName()) {
 			found.Insert(c.GetName())
@@ -204,7 +208,7 @@ func (o *Options) GetManager(ctx context.Context, opts flagutils.OptionSetProvid
 				err = provider.AddProvider(c.GetName(), c.AsFleet().GetProvider())
 			} else {
 				cfg.Logger.Info("adding cluster {{cluster}} -> {{effective}}", "cluster", c.GetName(), "effective", c.GetEffective().GetName())
-				err = m.GetLocalManager().Add(eff.AsCluster())
+				err = clusterprovider.Add(ctx, eff.GetName(), eff.AsCluster())
 			}
 		} else {
 			cfg.Logger.Info("cluster {{cluster}} -> {{effective}} already added", "cluster", c.GetName(), "effective", c.GetEffective().GetName())

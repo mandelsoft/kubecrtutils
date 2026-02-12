@@ -121,7 +121,7 @@ func (r *DefaultReconcileRequest[T, R]) Reconcile() reconcile2.Problem {
 
 type ReconciliationByReconcileFunc[P kubecrtutils.ObjectPointer[T], T any] func(request ReconcileRequest[P]) reconcile2.Problem
 
-func (f ReconciliationByReconcileFunc[P, T]) CreateReconciler(ctx context.Context, controller controller.Controller[T, P], b *builder2.Builder) (reconcile.Reconciler, error) {
+func (f ReconciliationByReconcileFunc[P, T]) CreateReconciler(ctx context.Context, controller controller.Controller[P, T], b *builder2.Builder) (reconcile.Reconciler, error) {
 	return CRTReconcilerFor[P, T](controller, &defaultReconciler[P, T]{f}, 0), nil
 }
 
@@ -148,7 +148,7 @@ type crtReconciler[T client.Object] struct {
 
 var _ CRTReconciler = (*crtReconciler[client.Object])(nil)
 
-func CRTReconcilerFor[P kubecrtutils.ObjectPointer[T], T any](c controller.Controller[T, P], r Reconciler[P], after ...time.Duration) CRTReconciler {
+func CRTReconcilerFor[P kubecrtutils.ObjectPointer[T], T any](c controller.Controller[P, T], r Reconciler[P], after ...time.Duration) CRTReconciler {
 	return &crtReconciler[P]{
 		name:       c.GetName(),
 		logger:     c.GetLogger(),
@@ -177,7 +177,7 @@ func (d *crtReconciler[T]) Reconcile(ctx context.Context, request reconcile.Requ
 		Context:       ctx,
 		Cluster:       cl,
 		EventRecorder: cl.GetEventRecorderFor(d.name),
-		Logger:        d.logger.WithName(request.String()).WithValues("object", request.NamespacedName, "cluster", cl.GetName()),
+		Logger:        d.logger.WithName(request.String()).WithValues("object", request.NamespacedName, "cluster", cl.GetName(), "effcluster", cl.GetEffective().GetName()),
 		Request:       request,
 		After:         d.after,
 	}

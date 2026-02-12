@@ -150,7 +150,7 @@ func (cm *_controllermanager) GetMainCluster() cluster.ClusterEquivalent {
 	return cm.main
 }
 
-func (cm *_controllermanager) GetCluster(name string) cluster.ClusterEquivalent {
+func (cm *_controllermanager) MapTechnicalName(name string) cluster.ClusterEquivalent {
 	return cm.clusters.Get(name)
 }
 

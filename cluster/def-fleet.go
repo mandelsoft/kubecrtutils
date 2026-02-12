@@ -30,6 +30,10 @@ func (def *fleetDef) MustBeFleet() *fleetDef {
 
 ////////////////////////////////////////////////////////////////////////////////
 
+func (d *fleetDef) AcceptFleet() bool {
+	return true
+}
+
 func (d *fleetDef) RequireFleet() bool {
 	return d.required
 }

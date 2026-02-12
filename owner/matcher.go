@@ -5,10 +5,11 @@ import (
 )
 
 func MatcherFor(c types.ClusterEquivalent) ClusterMatcher {
-	return func(clusterId string) string {
+	return func(clusterId string) (string, bool) {
+		ok := clusterId == c.GetId()
 		if cl := c.GetClusterById(clusterId); cl != nil {
-			return cl.GetName()
+			return cl.GetName(), ok
 		}
-		return ""
+		return "", false
 	}
 }

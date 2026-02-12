@@ -17,13 +17,28 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	sigclient "sigs.k8s.io/controller-runtime/pkg/client"
 	sigcluster "sigs.k8s.io/controller-runtime/pkg/cluster"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	mcreconcile "sigs.k8s.io/multicluster-runtime/pkg/reconcile"
 )
 
 type _cluster struct {
 	name   string
 	id     string
 	scheme *runtime.Scheme
+}
+
+func (_ *_cluster) TriggerSource(obj runtime.Object) (enqueue.TypedEnqueue[mcreconcile.Request], error) {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (_ *_cluster) GetInfo() string {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (_ *_cluster) GetTypeInfo() string {
+	// TODO implement me
+	panic("implement me")
 }
 
 func (_ *_cluster) IndexField(ctx context.Context, obj sigclient.Object, field string, extractValue sigclient.IndexerFunc) error {
@@ -95,10 +110,6 @@ func (c *_cluster) Match(clusterName string) bool {
 
 func (c *_cluster) FilterById(clusterId string) bool {
 	return c.id == clusterId
-}
-
-func (_ *_cluster) TriggerSource(obj runtime.Object) (enqueue.TypedEnqueue[reconcile.Request], error) {
-	panic("implement me")
 }
 
 func (_ *_cluster) Apply(ctx context.Context, obj runtime.ApplyConfiguration, opts ...sigclient.ApplyOption) error {

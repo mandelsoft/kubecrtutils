@@ -88,6 +88,9 @@ func (d *definitions) Validate(ctx context.Context, opts flagutils.OptionSet, v 
 					}
 					eff := d.clusters.Get(fb)
 					if eff != nil {
+						if !def.AcceptFleet() && eff.AsFleet() != nil {
+							return fmt.Errorf("fallback %q for cluster %q is fleet", def, fb, n)
+						}
 						d.clusters.Add(NewClusterLikeAlias(n, eff))
 						found = true
 					} else {

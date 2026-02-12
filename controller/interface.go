@@ -8,8 +8,8 @@ import (
 
 type Controllers = types.Controllers
 
-type Controller[T any, P kubecrtutils.ObjectPointer[T]] interface {
+type Controller[P kubecrtutils.ObjectPointer[T], T any] interface {
 	types.Controller
-	GetDefinition() TypedDefinition[T, P]
+	GetDefinition() TypedDefinition[P, T]
 	GetTypedIndex(name string) cacheindex.TypedIndex[T]
 }

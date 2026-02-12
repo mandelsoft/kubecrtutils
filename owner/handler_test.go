@@ -47,13 +47,15 @@ func CheckAnno(obj sigclient.Object, val string) {
 		ExpectWithOffset(1, obj.GetAnnotations()).To(BeNil())
 	} else {
 		ExpectWithOffset(1, obj.GetAnnotations()).NotTo(BeNil())
-		v := obj.GetAnnotations()[owner.DEFAULT_REMOTE_NAME]
+		v := obj.GetAnnotations()[owner.DEFAULT_ANNOTATION_NAME]
 		ExpectWithOffset(1, v).To(Equal(val))
 	}
 }
 
-var cluster1 = NewCluster("A", "IdA")
-var cluster2 = NewCluster("B", "IdB")
+var IdA = "IdA"
+var IdB = "IdB"
+var cluster1 = NewCluster("A", IdA)
+var cluster2 = NewCluster("B", IdB)
 var clusterN = NewCluster("nested/A", "IdNested/A")
 
 var _ = Describe("Owner Test Environment", func() {
@@ -89,7 +91,7 @@ var _ = Describe("Owner Test Environment", func() {
 		gvkSlave, _ = apiutil.GVKForObject(_slaveDefault, clientgoscheme.Scheme)
 	})
 
-	handler := owner.NewHandler(clientgoscheme.Scheme)
+	handler := owner.NewHandlerWithScheme(clientgoscheme.Scheme)
 	match1 := owner.MatcherFor(cluster1)
 	match2 := owner.MatcherFor(cluster2)
 
@@ -120,7 +122,7 @@ var _ = Describe("Owner Test Environment", func() {
 
 		It("same namespace", func() {
 			MustBeSuccessful(handler.SetOwner(cluster1, _owner, cluster2, _slaveDefault))
-			CheckAnno(_slaveDefault, "core/Service/default/owner/IdA")
+			CheckAnno(_slaveDefault, "IdA/core/Service/default/owner")
 
 			Expect(Ref(handler.GetOwner(match1, cluster2, _slaveDefault, gvkOwner.GroupKind()))).To(Equal(RefO(cluster1, _owner)))
 			Expect(Ref(handler.GetOwner(match1, cluster2, _slaveDefault, gvkSlave.GroupKind()))).To(BeNil())
@@ -128,7 +130,7 @@ var _ = Describe("Owner Test Environment", func() {
 
 		It("cross namespace", func() {
 			MustBeSuccessful(handler.SetOwner(cluster1, _owner, cluster2, _slaveOther))
-			CheckAnno(_slaveOther, "core/Service/default/owner/IdA")
+			CheckAnno(_slaveOther, "IdA/core/Service/default/owner")
 
 			Expect(Ref(handler.GetOwner(match1, cluster2, _slaveOther, gvkOwner.GroupKind()))).To(Equal(RefO(cluster1, _owner)))
 			Expect(Ref(handler.GetOwner(match1, cluster2, _slaveOther, gvkSlave.GroupKind()))).To(BeNil())

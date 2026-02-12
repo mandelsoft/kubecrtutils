@@ -26,7 +26,6 @@ type _fleet struct {
 var _ fleet.Fleet = (*_fleet)(nil)
 
 func New(t types.FleetType, name, id string, cfg *rest.Config, endpointSliceName string, options apiexport.Options) (*_fleet, error) {
-
 	if id == "" {
 		id = name
 	}
@@ -58,19 +57,34 @@ func New(t types.FleetType, name, id string, cfg *rest.Config, endpointSliceName
 }
 
 func (k *_fleet) GetCluster(name string) types.Cluster {
+	f, n := fpi.Split(name)
+	if f != k.GetName() && f != "" {
+		return nil
+	}
+	return k.registrations.GetCluster(n)
+}
+
+func (k *_fleet) GetClusterByLocalName(name string) types.Cluster {
 	return k.registrations.GetCluster(name)
 }
 
 func (k *_fleet) GetClusterById(id string) types.ClusterEquivalent {
-	b, n := k.Split(id)
+	if id == k.GetId() {
+		return k
+	}
+	b, n := fpi.Split(id)
 	if b != k.GetId() {
 		return nil
 	}
-	return k.registrations.GetCluster(k.Compose(n))
+	return k.registrations.GetCluster(n)
 }
 
 func (k *_fleet) GetInfo() string {
 	return k.GetBaseCluster().GetConfig().Host
+}
+
+func (k *_fleet) GetTypeInfo() string {
+	return k.GetType().GetType() + " fleet"
 }
 
 func (k *_fleet) GetClusterNames() []string {
@@ -138,11 +152,7 @@ func (r *registrations) GetClusterNames() []string {
 func (r *registrations) GetCluster(name string) types.Cluster {
 	r.lock.Lock()
 	defer r.lock.Unlock()
-	f, n := r.Split(name)
-	if f != r.GetName() {
-		return nil
-	}
-	return r.clusters[n]
+	return r.clusters[name]
 }
 
 func (r *registrations) Engage(ctx context.Context, name string, cluster cluster.Cluster) error {

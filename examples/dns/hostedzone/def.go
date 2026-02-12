@@ -8,12 +8,12 @@ import (
 )
 
 func Controller() controller.Definition {
-	return controller.Define[corednsv1alpha1.HostedZone]("coredns.mandelsoft.hostedzone", "dataplane", &ReconcilerFactory{}).
+	return controller.Define[*corednsv1alpha1.HostedZone]("coredns.mandelsoft.hostedzone", "dataplane", &ReconcilerFactory{}).
 		UseCluster("runtime").
 		AddIndex("IndexKeyZoneParent", parentIndexer).
 		AddTrigger(
-			controller.OwnerTrigger[appsv1.Deployment]().OnCluster("runtime"),
-			controller.OwnerTrigger[corev1.Secret]().OnCluster("runtime"),
+			controller.OwnerTrigger[*appsv1.Deployment]().OnCluster("runtime"),
+			controller.OwnerTrigger[*corev1.Secret]().OnCluster("runtime"),
 		)
 }
 

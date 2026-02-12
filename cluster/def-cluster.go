@@ -19,6 +19,10 @@ func Define(name string, desc string, rule ...config.Rule) *clusterDef {
 	return d
 }
 
+func (d *clusterDef) AcceptFleet() bool {
+	return false
+}
+
 func (d *clusterDef) Create(defs Definitions) (ClusterEquivalent, error) {
 	ropts := &config.ConfigOptions{}
 	cfg, err := d.GetConfig(ropts)

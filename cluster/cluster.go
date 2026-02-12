@@ -12,18 +12,18 @@ import (
 	"github.com/mandelsoft/kubecrtutils/merge"
 	"github.com/mandelsoft/kubecrtutils/types"
 	"k8s.io/apimachinery/pkg/util/managedfields"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/cluster"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	mcreconcile "sigs.k8s.io/multicluster-runtime/pkg/reconcile"
 )
 
 type _cluster struct {
 	lock sync.Mutex
 	cluster.Cluster
 	client.Client
-	enqueue.TypedMux[reconcile.Request]
+	enqueue.TypedMux[mcreconcile.Request]
 
 	name      string
 	id        string
@@ -67,15 +67,16 @@ func NewClusterForCRTCluster(name string, c cluster.Cluster, opts ...any) Cluste
 		cl = c.GetClient()
 	}
 
-	return &_cluster{
+	r := &_cluster{
 		Cluster:   c,
 		Client:    cl,
 		name:      name,
 		id:        id,
 		converter: conv,
-		TypedMux:  enqueue.NewMux(c.GetScheme()),
 		indices:   map[string]Index{},
 	}
+	r.TypedMux = enqueue.NewTypedMux[mcreconcile.Request](c.GetScheme(), r.createRequest)
+	return r
 }
 
 func NewCluster(name string, config *config.Config, opts ...cluster.Option) (Cluster, error) {
@@ -91,15 +92,16 @@ func NewCluster(name string, config *config.Config, opts ...cluster.Option) (Clu
 	if err != nil {
 		return nil, err
 	}
-	return &_cluster{
+	r := &_cluster{
 		Cluster:   c,
 		Client:    c.GetClient(),
 		name:      name,
 		id:        id,
 		converter: conv,
 		indices:   map[string]Index{},
-		TypedMux:  enqueue.NewMux(c.GetScheme()),
-	}, nil
+	}
+	r.TypedMux = enqueue.NewTypedMux[mcreconcile.Request](c.GetScheme(), r.createRequest)
+	return r, nil
 }
 
 func (c *_cluster) GetName() string {
@@ -108,6 +110,10 @@ func (c *_cluster) GetName() string {
 
 func (c *_cluster) GetInfo() string {
 	return c.GetConfig().Host
+}
+
+func (c *_cluster) GetTypeInfo() string {
+	return "cluster"
 }
 
 func (c *_cluster) Unwrap() Cluster {
@@ -135,7 +141,7 @@ func (c *_cluster) Filter(clusterName string, cluster cluster.Cluster) bool {
 }
 
 func (c *_cluster) Match(clusterName string) bool {
-	return c.GetName() == clusterName
+	return c.GetName() == Normalize(clusterName)
 }
 
 func (c *_cluster) FilterById(clusterId string) bool {
@@ -166,6 +172,10 @@ func (c *_cluster) GetCluster() cluster.Cluster {
 
 func (c *_cluster) GetTypeConverter() managedfields.TypeConverter {
 	return c.converter
+}
+
+func (c *_cluster) createRequest(ctx context.Context, key client.ObjectKey) (mcreconcile.Request, error) {
+	return mcreconcile.Request{ClusterName: c.GetName(), Request: reconcile.Request{key}}, nil
 }
 
 // shitty manager API always creates an own cluster
@@ -245,14 +255,4 @@ func (c *_cluster) CreateIndex(ctx context.Context, name string, proto client.Ob
 
 	c.indices[name] = idx
 	return idx, nil
-}
-
-func (c *_cluster) ApplyTrigger(builder *ctrl.Builder, proto client.Object) error {
-	trigger, err := c.TriggerSource(proto)
-
-	if err != nil {
-		return err
-	}
-	builder.WatchesRawSource(trigger)
-	return nil
 }

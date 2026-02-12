@@ -47,6 +47,10 @@ func NewFleetAlias(name string, c Fleet) Fleet {
 	return a
 }
 
+func (c *_fleetAlias) Compose(name string) string {
+	return c.Composer.Compose(name)
+}
+
 func (c *_fleetAlias) Match(name string) bool {
 	return c.Composer.Match(name) || c.Fleet.Match(name)
 }
@@ -55,25 +59,13 @@ func (c *_fleetAlias) GetName() string {
 	return c.Composer.GetName()
 }
 
-func (c *_fleetAlias) Compose(name string) string {
-	return c.Composer.Compose(name)
-}
-
-func (c *_fleetAlias) Strip(name string) string {
-	return c.Composer.Strip(name)
-}
-
-func (c *_fleetAlias) Split(name string) (string, string) {
-	return c.Composer.Split(name)
-}
-
 func (c *_fleetAlias) Unwrap() Fleet {
 	return c.Fleet
 }
 
 func (c *_fleetAlias) GetCluster(name string) Cluster {
 	var f Cluster
-	base, l := c.Split(name)
+	base, l := fpi.Split(name)
 	if c.GetName() != base {
 		return nil
 	}

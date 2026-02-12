@@ -57,12 +57,12 @@ func (s *Support) Filter(clusterName string, cluster cluster.Cluster) bool {
 }
 
 func (s *Support) Match(clusterName string) bool {
-	b, _ := s.Split(clusterName)
+	b, _ := Split(clusterName)
 	return b == s.name
 }
 
 func (s *Support) FilterById(clusterId string) bool {
-	b, _ := s.Split(clusterId)
+	b, _ := Split(clusterId)
 	return b == s.GetId()
 }
 
@@ -79,7 +79,7 @@ func (s *Support) _getCluster(ctx context.Context) (types.Cluster, error) {
 	if c == nil {
 		return nil, ErrClusterNotFoundInContext
 	}
-	b, _ := s.Split(c.GetName())
+	b, _ := Split(c.GetName())
 	if b != s.name {
 		return nil, ErrClusterNotOwned
 	}

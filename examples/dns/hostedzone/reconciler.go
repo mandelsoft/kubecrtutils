@@ -7,7 +7,7 @@ import (
 )
 
 type Reconciler struct {
-	controller controller.Controller[v1alpha1.HostedZone, *v1alpha1.HostedZone]
+	controller controller.Controller[*v1alpha1.HostedZone, v1alpha1.HostedZone]
 }
 
 func (r *Reconciler) Request(def *reconciler.BaseRequest[*v1alpha1.HostedZone]) reconciler.ReconcileRequest[*v1alpha1.HostedZone] {

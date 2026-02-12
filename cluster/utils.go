@@ -3,9 +3,11 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/mandelsoft/goutils/general"
 	"github.com/mandelsoft/goutils/generics"
+	"github.com/mandelsoft/kubecrtutils/cluster/fleet/fpi"
 	"github.com/mandelsoft/kubecrtutils/merge"
 	"github.com/mandelsoft/kubecrtutils/objutils"
 	types2 "github.com/mandelsoft/kubecrtutils/types"
@@ -270,4 +272,11 @@ func (w *modificationWrapper) Modify(cluster types2.Cluster, obj client.Object) 
 		return err
 	}
 	return w.mod.Modify(cluster, obj)
+}
+
+func Normalize(clusterName string) string {
+	if strings.HasPrefix(clusterName, fpi.SEPARATOR) {
+		return strings.TrimPrefix(clusterName, fpi.SEPARATOR)
+	}
+	return clusterName
 }

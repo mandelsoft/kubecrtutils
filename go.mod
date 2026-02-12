@@ -8,7 +8,7 @@ require (
 	github.com/google/cel-go v0.26.0
 	github.com/kcp-dev/multicluster-provider v0.3.3
 	github.com/mandelsoft/flagutils v0.0.0-20260105014053-ff948a418990
-	github.com/mandelsoft/goutils v0.0.0-20251108170156-7404c5a2417e
+	github.com/mandelsoft/goutils v0.0.0-20260209132453-cd86279dc63b
 	github.com/mandelsoft/logging v0.0.0-20240618075559-fdca28a87b0a
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee
 	github.com/onsi/ginkgo/v2 v2.27.2

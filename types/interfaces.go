@@ -12,7 +12,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/cluster"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -26,7 +25,7 @@ type ControllerManager interface {
 	GetName() string
 	GetManager() mcctrl.Manager
 	GetMainCluster() ClusterEquivalent
-	GetCluster(name string) ClusterEquivalent
+	MapTechnicalName(name string) ClusterEquivalent
 	GetClusters() Clusters
 	GetIndex(name string) Index
 	GetIndices() Indices
@@ -72,7 +71,6 @@ type Controllers interface {
 
 type Cluster interface {
 	ClusterEquivalent
-	enqueue.TypedMux[reconcile.Request]
 
 	client.Client
 	cluster.Cluster
@@ -83,7 +81,6 @@ type Cluster interface {
 	GetIndex(name string) Index
 
 	GetTypeConverter() managedfields.TypeConverter
-	ApplyTrigger(builder *ctrl.Builder, proto client.Object) error
 
 	IsSameAs(ClusterEquivalent) bool
 }
@@ -122,9 +119,7 @@ type ClusterDefinition interface {
 	GetFallback() string
 	GetDescription() string
 	GetScheme() *runtime.Scheme
-
-	// WithFallback(fallback string) ClusterDefinition
-	// WithScheme(scheme *runtime.Scheme) ClusterDefinition
+	AcceptFleet() bool
 
 	Create(defs ClusterDefinitions) (ClusterEquivalent, error)
 }
@@ -142,19 +137,18 @@ type ClusterDefinitions interface {
 
 type Fleet interface {
 	ClusterEquivalent
-	enqueue.TypedMux[mcreconcile.Request]
 
 	GetType() FleetType
 
 	GetProvider() multicluster.Provider
 	GetClusterNames() []string
 	GetCluster(name string) Cluster
+	GetClusterByLocalName(name string) Cluster
 
 	GetClusterById(id string) ClusterEquivalent
 
 	GetBaseCluster() Cluster
 
-	Strip(name string) string
 	Compose(name string) string
 }
 
@@ -166,11 +160,12 @@ type FleetType interface {
 
 type ClusterEquivalent interface {
 	client.FieldIndexer
-	enqueue.Mux
+	enqueue.TypedMux[mcreconcile.Request]
 
 	GetName() string
 	GetId() string
 	GetInfo() string
+	GetTypeInfo() string
 
 	GetScheme() *runtime.Scheme
 	GetEffective() ClusterEquivalent

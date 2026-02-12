@@ -8,12 +8,14 @@ import (
 	"slices"
 
 	"github.com/mandelsoft/flagutils"
+	"github.com/mandelsoft/goutils/generics"
 	"github.com/mandelsoft/kubecrtutils"
 	"github.com/mandelsoft/kubecrtutils/cacheindex"
 	"github.com/mandelsoft/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubecrtutils/cluster/clustercontext"
 	"github.com/mandelsoft/kubecrtutils/controller/builder"
 	"github.com/mandelsoft/kubecrtutils/internal"
+	"github.com/mandelsoft/kubecrtutils/owner"
 	"github.com/mandelsoft/kubecrtutils/types"
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -23,13 +25,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-type ReconcilerFactory[T any, P kubecrtutils.ObjectPointer[T]] interface {
-	CreateReconciler(ctx context.Context, controller Controller[T, P], b builder.Builder) (reconcile.Reconciler, error)
+type ReconcilerFactory[P kubecrtutils.ObjectPointer[T], T any] interface {
+	CreateReconciler(ctx context.Context, controller Controller[P, T], b builder.Builder) (reconcile.Reconciler, error)
 }
 
-type ReconcilerFactoryFunc[T any, P kubecrtutils.ObjectPointer[T]] func(ctx context.Context, controller Controller[T, P], b builder.Builder) (reconcile.Reconciler, error)
+type ReconcilerFactoryFunc[P kubecrtutils.ObjectPointer[T], T any] func(ctx context.Context, controller Controller[P, T], b builder.Builder) (reconcile.Reconciler, error)
 
-func (f ReconcilerFactoryFunc[T, P]) CreateReconciler(ctx context.Context, controller Controller[T, P], b builder.Builder) (reconcile.Reconciler, error) {
+func (f ReconcilerFactoryFunc[P, T]) CreateReconciler(ctx context.Context, controller Controller[P, T], b builder.Builder) (reconcile.Reconciler, error) {
 	return f(ctx, controller, b)
 }
 
@@ -37,65 +39,65 @@ func (f ReconcilerFactoryFunc[T, P]) CreateReconciler(ctx context.Context, contr
 
 type Definition = types.ControllerDefinition
 
-type TypedDefinition[T any, P kubecrtutils.ObjectPointer[T]] interface {
+type TypedDefinition[P kubecrtutils.ObjectPointer[T], T any] interface {
 	Definition
 
-	GetReconciler() ReconcilerFactory[T, P]
+	GetReconciler() ReconcilerFactory[P, T]
 	GetTriggers() []ResourceTriggerDefinition
 
-	AddIndex(name string, indexerFunc cacheindex.IndexerFunc[P]) TypedDefinition[T, P]
-	AddTrigger(trigger ...ResourceTriggerDefinition) TypedDefinition[T, P]
-	UseCluster(name ...string) TypedDefinition[T, P]
+	AddIndex(name string, indexerFunc cacheindex.IndexerFunc[P]) TypedDefinition[P, T]
+	AddTrigger(trigger ...ResourceTriggerDefinition) TypedDefinition[P, T]
+	UseCluster(name ...string) TypedDefinition[P, T]
 }
 
-type _definition[T any, P kubecrtutils.ObjectPointer[T]] struct {
+type _definition[P kubecrtutils.ObjectPointer[T], T any] struct {
 	internal.Element
 	predicates []predicate.Predicate
 	cluster    string
 	clusters   sets.Set[string]
 	proto      client.Object
-	reconciler ReconcilerFactory[T, P]
-	indices    map[string]cacheindex.TypedDefinition[T, P]
+	reconciler ReconcilerFactory[P, T]
+	indices    map[string]cacheindex.TypedDefinition[P, T]
 	triggers   []ResourceTriggerDefinition
 	err        error
 }
 
-func DefineByFunc[T any, P kubecrtutils.ObjectPointer[T]](name string, cluster string, fac ReconcilerFactoryFunc[T, P]) TypedDefinition[T, P] {
-	return Define[T, P](name, cluster, fac)
+func DefineByFunc[P kubecrtutils.ObjectPointer[T], T any](name string, cluster string, fac ReconcilerFactoryFunc[P, T]) TypedDefinition[P, T] {
+	return Define[P, T](name, cluster, fac)
 }
 
-func Define[T any, P kubecrtutils.ObjectPointer[T]](name string, cluster string, fac ReconcilerFactory[T, P]) TypedDefinition[T, P] {
-	d := &_definition[T, P]{
+func Define[P kubecrtutils.ObjectPointer[T], T any](name string, cluster string, fac ReconcilerFactory[P, T]) TypedDefinition[P, T] {
+	d := &_definition[P, T]{
 		Element:    internal.NewElement(name),
 		cluster:    cluster,
 		clusters:   sets.New[string](cluster),
-		proto:      kubecrtutils.Proto[T, P](),
+		proto:      generics.ObjectFor[P](),
 		reconciler: fac,
-		indices:    map[string]cacheindex.TypedDefinition[T, P]{},
+		indices:    map[string]cacheindex.TypedDefinition[P, T]{},
 	}
 	return d
 }
 
-func (d *_definition[T, P]) WithPredicates(preds ...predicate.Predicate) *_definition[T, P] {
+func (d *_definition[P, T]) WithPredicates(preds ...predicate.Predicate) *_definition[P, T] {
 	d.predicates = append(d.predicates, preds...)
 	return d
 }
 
-func (d *_definition[T, P]) UseCluster(name ...string) TypedDefinition[T, P] {
+func (d *_definition[P, T]) UseCluster(name ...string) TypedDefinition[P, T] {
 	d.clusters.Insert(name...)
 	return d
 }
 
-func (d *_definition[T, P]) AddIndex(name string, indexerFunc cacheindex.IndexerFunc[P]) TypedDefinition[T, P] {
+func (d *_definition[P, T]) AddIndex(name string, indexerFunc cacheindex.IndexerFunc[P]) TypedDefinition[P, T] {
 	if d.indices[name] != nil {
 		d.err = errors.Join(d.err, fmt.Errorf("duplicate deinition of index %q", name))
 	} else {
-		d.indices[name] = cacheindex.NewDefinition[T, P](GlobalControllerIndexName(d.GetName(), name), d.cluster, indexerFunc)
+		d.indices[name] = cacheindex.NewDefinition[P, T](GlobalControllerIndexName(d.GetName(), name), d.cluster, indexerFunc)
 	}
 	return d
 }
 
-func (d *_definition[T, P]) AddTrigger(trigger ...ResourceTriggerDefinition) TypedDefinition[T, P] {
+func (d *_definition[P, T]) AddTrigger(trigger ...ResourceTriggerDefinition) TypedDefinition[P, T] {
 	for _, t := range trigger {
 		d.triggers = append(d.triggers, t)
 		if t.GetCluster() != "" {
@@ -105,42 +107,42 @@ func (d *_definition[T, P]) AddTrigger(trigger ...ResourceTriggerDefinition) Typ
 	return d
 }
 
-func (d *_definition[T, P]) AddFlags(fs *pflag.FlagSet) {
+func (d *_definition[P, T]) AddFlags(fs *pflag.FlagSet) {
 	if o, ok := d.reconciler.(flagutils.Options); ok {
 		o.AddFlags(fs)
 	}
 }
 
-func (d *_definition[T, P]) AsOptionSet() flagutils.OptionSet {
+func (d *_definition[P, T]) AsOptionSet() flagutils.OptionSet {
 	if o, ok := d.reconciler.(flagutils.OptionSetProvider); ok {
 		return o.AsOptionSet()
 	}
 	return flagutils.DefaultOptionSet{}
 }
 
-func (d *_definition[T, P]) Validate(ctx context.Context, opts flagutils.OptionSet, v flagutils.ValidationSet) error {
+func (d *_definition[P, T]) Validate(ctx context.Context, opts flagutils.OptionSet, v flagutils.ValidationSet) error {
 	if o, ok := d.reconciler.(flagutils.Validatable); ok {
 		return o.Validate(ctx, opts, v)
 	}
 	return v.ValidateSet(ctx, opts, d.AsOptionSet())
 }
 
-func (d *_definition[T, P]) Finalize(ctx context.Context, opts flagutils.OptionSet, v flagutils.FinalizationSet) error {
+func (d *_definition[P, T]) Finalize(ctx context.Context, opts flagutils.OptionSet, v flagutils.FinalizationSet) error {
 	if o, ok := d.reconciler.(flagutils.Finalizable); ok {
 		return o.Finalize(ctx, opts, v)
 	}
 	return v.FinalizeSet(ctx, opts, d.AsOptionSet())
 }
 
-func (d *_definition[T, P]) GetError() error {
+func (d *_definition[P, T]) GetError() error {
 	return d.err
 }
 
-func (d *_definition[T, P]) GetCluster() string {
+func (d *_definition[P, T]) GetCluster() string {
 	return d.cluster
 }
 
-func (d *_definition[T, P]) GetClusters() sets.Set[string] {
+func (d *_definition[P, T]) GetClusters() sets.Set[string] {
 	return maps.Clone(d.clusters)
 }
 
@@ -148,19 +150,19 @@ func (d *_definition[T, P]) GetResource() client.Object {
 	return d.proto
 }
 
-func (d *_definition[T, P]) GetWatchPredicates() []predicate.Predicate {
+func (d *_definition[P, T]) GetWatchPredicates() []predicate.Predicate {
 	return slices.Clone(d.predicates)
 }
 
-func (d *_definition[T, P]) GetReconciler() ReconcilerFactory[T, P] {
+func (d *_definition[P, T]) GetReconciler() ReconcilerFactory[P, T] {
 	return d.reconciler
 }
 
-func (d *_definition[T, P]) GetTriggers() []ResourceTriggerDefinition {
+func (d *_definition[P, T]) GetTriggers() []ResourceTriggerDefinition {
 	return slices.Clone(d.triggers)
 }
 
-func (d *_definition[T, P]) CreateController(ctx context.Context, mgr types.ControllerManager) (types.Controller, error) {
+func (d *_definition[P, T]) CreateController(ctx context.Context, mgr types.ControllerManager) (types.Controller, error) {
 	logger := mgr.GetLogger().WithName(d.GetName()).WithValues("controller", d.GetName())
 	logger.Info("configure controller {{controller}}")
 
@@ -204,7 +206,7 @@ func (d *_definition[T, P]) CreateController(ctx context.Context, mgr types.Cont
 			return s
 		}
 	}
-	controller := &_controller[T, P]{
+	controller := &_controller[P, T]{
 		controllerManager: mgr,
 		logger:            logger,
 		clusters:          clusters, // TODO; name mapping
@@ -213,11 +215,12 @@ func (d *_definition[T, P]) CreateController(ctx context.Context, mgr types.Cont
 		definition:        d,
 		recorder:          f,
 		indices:           local,
+		ohandler:          owner.NewHandler(c),
 	}
 	return controller, nil
 }
 
-func (d *_definition[T, P]) GetOptions() flagutils.Options {
+func (d *_definition[P, T]) GetOptions() flagutils.Options {
 	if o, ok := d.reconciler.(flagutils.Options); ok {
 		return o
 	}
