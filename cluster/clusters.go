@@ -9,12 +9,13 @@ import (
 
 type clusters struct {
 	internal.Group[ClusterEquivalent]
+	multi bool
 }
 
 var _ Clusters = (*clusters)(nil)
 
 func NewClusters() Clusters {
-	return &clusters{internal.NewGroup[ClusterEquivalent]("cluster")}
+	return &clusters{Group: internal.NewGroup[ClusterEquivalent]("cluster")}
 }
 
 func (c *clusters) Get(name string) ClusterEquivalent {
@@ -46,4 +47,26 @@ func (c *clusters) GetClusterById(id string) ClusterEquivalent {
 		}
 	}
 	return nil
+}
+
+func (c *clusters) Add(elems ...ClusterEquivalent) error {
+	err := c.Group.Add(elems...)
+	if err != nil {
+		return err
+	}
+	if !c.multi {
+		for _, cl := range elems {
+			if cl.AsFleet() != nil {
+				c.multi = true
+			}
+			if c.Len() > 1 {
+				c.multi = true
+			}
+		}
+	}
+	return nil
+}
+
+func (c *clusters) IsMulti() bool {
+	return c.multi
 }

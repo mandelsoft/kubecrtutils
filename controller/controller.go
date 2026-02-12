@@ -10,6 +10,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/cluster/clustercontext"
 	abuilder "github.com/mandelsoft/kubecrtutils/controller/builder"
 	myhandler "github.com/mandelsoft/kubecrtutils/controller/handler"
+	"github.com/mandelsoft/kubecrtutils/objutils"
 	"github.com/mandelsoft/kubecrtutils/owner"
 	"github.com/mandelsoft/kubecrtutils/types"
 	"github.com/mandelsoft/logging"
@@ -30,16 +31,17 @@ import (
 type recorderFunc func(ctx context.Context) record.EventRecorder
 
 type _controller[P kubecrtutils.ObjectPointer[T], T any] struct {
-	controllerManager types.ControllerManager
-	definition        TypedDefinition[P, T]
-	logger            logging.Logger
-	clusters          types.Clusters
-	cluster           types.ClusterEquivalent
-	gk                schema.GroupKind
-	recorder          recorderFunc
-	indices           map[string]cacheindex.TypedIndex[T]
-	reconciler        reconcile.Reconciler
-	ohandler          owner.Handler
+	enforceNameExtension bool
+	controllerManager    types.ControllerManager
+	definition           TypedDefinition[P, T]
+	logger               logging.Logger
+	clusters             types.Clusters
+	cluster              types.ClusterEquivalent
+	gk                   schema.GroupKind
+	recorder             recorderFunc
+	indices              map[string]cacheindex.TypedIndex[T]
+	reconciler           reconcile.Reconciler
+	ohandler             owner.Handler
 }
 
 func (c *_controller[P, T]) GetName() string {
@@ -152,6 +154,17 @@ func (c *_controller[P, T]) addTrigger(ctx context.Context, bldr *mcbuilder.Buil
 		mcbuilder.WithClusterFilter(target.Filter),
 	)
 	return nil
+}
+
+func (c *_controller[P, T]) GenerateNameFor(ctx context.Context, tgt types.Cluster, prefix, namespace, name string, len ...int) string {
+	src := clustercontext.ClusterFor(ctx)
+	if src == nil || tgt.IsSameAs(src) {
+		return objutils.GenerateUniqueName(prefix, "", namespace, name, len...)
+	}
+	if c.enforceNameExtension || c.cluster.AsFleet() != nil || c.controllerManager.GetClusters().Len() > 2 {
+		return objutils.GenerateUniqueName(prefix, src.GetName(), namespace, name, len...)
+	}
+	return objutils.GenerateUniqueName(prefix, "", namespace, name, len...)
 }
 
 ////////////////////////////////////////////////////////////////////////////////

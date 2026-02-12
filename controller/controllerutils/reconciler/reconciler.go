@@ -55,9 +55,18 @@ type BaseRequest[T client.Object] struct {
 	context.Context
 	logging.Logger
 	reconcile.Request
-	Object T
-	Orig   T
-	After  time.Duration
+	controller types.Controller
+	Object     T
+	Orig       T
+	After      time.Duration
+}
+
+func (r *BaseRequest[T]) GenerateNameFor(tgt, prefix string, len ...int) string {
+	return r.controller.GenerateNameFor(r.Context, r.controller.GetClusters().Get(tgt).AsCluster(), prefix, r.Object.GetNamespace(), r.Object.GetName())
+}
+
+func (r *BaseRequest[T]) GetController() types.Controller {
+	return r.controller
 }
 
 func (r *BaseRequest[T]) GetObject() T {
@@ -140,6 +149,7 @@ func (r *defaultReconciler[P, T]) Request(base *BaseRequest[P]) ReconcileRequest
 
 type crtReconciler[T client.Object] struct {
 	name       string
+	controller types.Controller
 	cluster    types.ClusterEquivalent
 	logger     logging.Logger
 	reconciler Reconciler[T]
@@ -153,6 +163,7 @@ func CRTReconcilerFor[P kubecrtutils.ObjectPointer[T], T any](c controller.Contr
 		name:       c.GetName(),
 		logger:     c.GetLogger(),
 		cluster:    c.GetCluster(),
+		controller: c,
 		reconciler: r,
 		after:      general.Optional(after...),
 	}
@@ -160,6 +171,10 @@ func CRTReconcilerFor[P kubecrtutils.ObjectPointer[T], T any](c controller.Contr
 
 func (d *crtReconciler[T]) GetEffective() any {
 	return d.reconciler
+}
+
+func (d *crtReconciler[T]) GetController() types.Controller {
+	return d.controller
 }
 
 func (d *crtReconciler[T]) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
@@ -174,6 +189,7 @@ func (d *crtReconciler[T]) Reconcile(ctx context.Context, request reconcile.Requ
 		cl = clustercontext.ClusterFor(ctx)
 	}
 	req := BaseRequest[T]{
+		controller:    d.controller,
 		Context:       ctx,
 		Cluster:       cl,
 		EventRecorder: cl.GetEventRecorderFor(d.name),

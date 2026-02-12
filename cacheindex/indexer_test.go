@@ -11,12 +11,13 @@ import (
 )
 
 type TestType struct {
+	v1.TypeMeta `json:",inline"`
 	v1.ObjectMeta
 	Spec Spec `json:"spec"`
 }
 
 type Spec struct {
-	ParentRef string `json:"parantRef"`
+	ParentRef string `json:"parentRef"`
 }
 
 func (t *TestType) GetObjectKind() schema.ObjectKind {

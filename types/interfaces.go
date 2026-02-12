@@ -63,6 +63,8 @@ type Controller interface {
 	GetIndex(name string) Index
 
 	Complete(ctx context.Context) error
+
+	GenerateNameFor(ctx context.Context, tgt Cluster, prefix, namespace, name string, len ...int) string
 }
 
 type Controllers interface {
@@ -87,6 +89,7 @@ type Cluster interface {
 
 type Clusters interface {
 	internal.Group[ClusterEquivalent]
+	IsMulti() bool
 }
 
 type Index interface {

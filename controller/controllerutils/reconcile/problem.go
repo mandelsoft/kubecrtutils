@@ -24,6 +24,10 @@ type problem struct {
 	err     error
 }
 
+func Succeeded() Problem {
+	return nil
+}
+
 // Requeue requests a ratelimited back off without reporting a reconciliation error
 // iff there is an error given.
 func Requeue(err error) Problem {
