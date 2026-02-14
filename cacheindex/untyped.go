@@ -9,6 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 )
 
 type Lister func(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error
@@ -17,6 +18,7 @@ type index struct {
 	name        string
 	cluster     types.ClusterEquivalent
 	listFactory func() (client.ObjectList, error)
+	gvk         schema.GroupVersionKind
 }
 
 func NewDefaultIndex(name string, cluster types.ClusterEquivalent, proto runtime.Object) (Index, error) {
@@ -24,9 +26,14 @@ func NewDefaultIndex(name string, cluster types.ClusterEquivalent, proto runtime
 	if err != nil {
 		return nil, err
 	}
+	gvk, err := apiutil.GVKForObject(proto, cluster.GetScheme())
+	if err != nil {
+		return nil, err
+	}
 	return &index{
 		name:        name,
 		cluster:     cluster,
+		gvk:         gvk,
 		listFactory: fac,
 	}, nil
 }
@@ -37,6 +44,10 @@ func (i *index) GetName() string {
 
 func (i *index) GetCluster() types.ClusterEquivalent {
 	return i.cluster
+}
+
+func (i *index) GetGVK() schema.GroupVersionKind {
+	return i.gvk
 }
 
 func (i *index) GetList(ctx context.Context, namespace, key string) (client.ObjectList, error) {

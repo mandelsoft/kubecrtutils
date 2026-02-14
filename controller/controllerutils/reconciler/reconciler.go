@@ -11,7 +11,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubecrtutils/cluster/clustercontext"
 	"github.com/mandelsoft/kubecrtutils/controller"
-	reconcile2 "github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconcile"
+	myreconcile "github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconcile"
 	"github.com/mandelsoft/kubecrtutils/types"
 	"github.com/mandelsoft/logging"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -41,12 +41,12 @@ type ReconcileRequest[T client.Object] interface {
 	GetOrig() T
 
 	StatusChanged() bool
-	UpdateStatus() reconcile2.Problem
+	UpdateStatus() myreconcile.Problem
 	GetAfter() time.Duration
 
-	Reconcile() reconcile2.Problem
-	ReconcileDeleting() reconcile2.Problem
-	ReconcileDeleted() reconcile2.Problem
+	Reconcile() myreconcile.Problem
+	ReconcileDeleting() myreconcile.Problem
+	ReconcileDeleted() myreconcile.Problem
 }
 
 type BaseRequest[T client.Object] struct {
@@ -55,10 +55,11 @@ type BaseRequest[T client.Object] struct {
 	context.Context
 	logging.Logger
 	reconcile.Request
-	controller types.Controller
-	Object     T
-	Orig       T
-	After      time.Duration
+	controller  types.Controller
+	clusterName string
+	Object      T
+	Orig        T
+	After       time.Duration
 }
 
 func (r *BaseRequest[T]) GenerateNameFor(tgt, prefix string, len ...int) string {
@@ -71,6 +72,10 @@ func (r *BaseRequest[T]) GetController() types.Controller {
 
 func (r *BaseRequest[T]) GetObject() T {
 	return r.Object
+}
+
+func (r *BaseRequest[T]) GetClusterName() string {
+	return r.clusterName
 }
 
 func (r *BaseRequest[T]) GetOrig() T {
@@ -96,13 +101,13 @@ func (r *BaseRequest[T]) StatusChanged() bool {
 	return false
 }
 
-func (r *BaseRequest[T]) UpdateStatus() reconcile2.Problem {
+func (r *BaseRequest[T]) UpdateStatus() myreconcile.Problem {
 	err := r.Cluster.Status().Update(r, r.Object)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return nil
 		}
-		return reconcile2.TemporaryProblem(err)
+		return myreconcile.TemporaryProblem(err)
 	}
 	return nil
 }
@@ -114,21 +119,21 @@ type DefaultReconcileRequest[T client.Object, R any] struct {
 
 var _ ReconcileRequest[client.Object] = (*DefaultReconcileRequest[client.Object, any])(nil)
 
-func (r *DefaultReconcileRequest[T, R]) ReconcileDeleted() reconcile2.Problem {
+func (r *DefaultReconcileRequest[T, R]) ReconcileDeleted() myreconcile.Problem {
 	return nil
 }
 
-func (r *DefaultReconcileRequest[T, R]) ReconcileDeleting() reconcile2.Problem {
+func (r *DefaultReconcileRequest[T, R]) ReconcileDeleting() myreconcile.Problem {
 	return nil
 }
 
-func (r *DefaultReconcileRequest[T, R]) Reconcile() reconcile2.Problem {
+func (r *DefaultReconcileRequest[T, R]) Reconcile() myreconcile.Problem {
 	return nil
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
-type ReconciliationByReconcileFunc[P kubecrtutils.ObjectPointer[T], T any] func(request ReconcileRequest[P]) reconcile2.Problem
+type ReconciliationByReconcileFunc[P kubecrtutils.ObjectPointer[T], T any] func(request ReconcileRequest[P]) myreconcile.Problem
 
 func (f ReconciliationByReconcileFunc[P, T]) CreateReconciler(ctx context.Context, controller controller.Controller[P, T], b *builder2.Builder) (reconcile.Reconciler, error) {
 	return CRTReconcilerFor[P, T](controller, &defaultReconciler[P, T]{f}, 0), nil
@@ -179,19 +184,25 @@ func (d *crtReconciler[T]) GetController() types.Controller {
 
 func (d *crtReconciler[T]) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	var _nil T
-	var prob reconcile2.Problem
+	var prob myreconcile.Problem
 
 	var cl cluster.Cluster
-
+	var clusterName string
 	if d.cluster.AsCluster() != nil {
 		cl = d.cluster.AsCluster()
+		clusterName = cl.GetName()
 	} else {
 		cl = clustercontext.ClusterFor(ctx)
+		clusterName = clustercontext.ClusterNameFor(ctx)
 	}
+
+	cl.WaitForCacheSync(ctx)
+
 	req := BaseRequest[T]{
 		controller:    d.controller,
 		Context:       ctx,
 		Cluster:       cl,
+		clusterName:   clusterName,
 		EventRecorder: cl.GetEventRecorderFor(d.name),
 		Logger:        d.logger.WithName(request.String()).WithValues("object", request.NamespacedName, "cluster", cl.GetName(), "effcluster", cl.GetEffective().GetName()),
 		Request:       request,
@@ -208,6 +219,7 @@ func (d *crtReconciler[T]) Reconcile(ctx context.Context, request reconcile.Requ
 			effreq = d.reconciler.Request(&req)
 			effreq.Info("*** reconcile deleted")
 			prob = effreq.ReconcileDeleted()
+			return myreconcile.Result(effreq, prob)
 		} else {
 			return reconcile.Result{}, err
 		}
@@ -224,7 +236,7 @@ func (d *crtReconciler[T]) Reconcile(ctx context.Context, request reconcile.Requ
 
 	}
 	if effreq.StatusChanged() {
-		prob = reconcile2.AggregateProblem(prob, effreq.UpdateStatus())
+		prob = myreconcile.AggregateProblem(prob, effreq.UpdateStatus())
 	}
-	return reconcile2.Result(effreq, prob, effreq.GetAfter())
+	return myreconcile.Result(effreq, prob, effreq.GetAfter())
 }

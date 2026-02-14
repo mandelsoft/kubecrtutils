@@ -148,9 +148,13 @@ func (c *_controller[P, T]) addTrigger(ctx context.Context, bldr *mcbuilder.Buil
 
 	c.logger.Info("configure resource-based trigger for {{resource}}[{{trigger}}] on {{type}} {{cluster}}[{{effcluster}}]}", "trigger", tdef.GetDescription(), "resource", gk, "type", target.GetTypeInfo(), "cluster", d.GetCluster(), "effcluster", target.GetEffective().GetName())
 
+	m, err := tdef.GetMapper()(ctx, c)
+	if err != nil {
+		return fmt.Errorf("trigger %q: %w", err)
+	}
 	bldr.Watches(
 		tdef.GetResource(),
-		watchWrapper[P, T](c, myhandler.EnqueueRequestFromMapFuncFactory(tdef.GetMapper()(ctx, c))),
+		watchWrapper[P, T](c, myhandler.EnqueueRequestFromMapFuncFactory(m)),
 		mcbuilder.WithClusterFilter(target.Filter),
 	)
 	return nil
@@ -176,7 +180,7 @@ type reconcileWrapper[P kubecrtutils.ObjectPointer[T], T any] struct {
 
 func (r *reconcileWrapper[P, T]) Reconcile(ctx context.Context, request mcreconcile.Request) (reconcile.Result, error) {
 	cl := r.controller.GetControllerManager().MapTechnicalName(request.ClusterName).AsCluster()
-	return r.reconciler.Reconcile(clustercontext.WithCluster(ctx, cl), request.Request)
+	return r.reconciler.Reconcile(clustercontext.WithCluster(clustercontext.WithClusterName(ctx, request.ClusterName), cl), request.Request)
 }
 
 ////////////////////////////////////////////////////////////////////////////////

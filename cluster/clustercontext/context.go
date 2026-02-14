@@ -16,3 +16,14 @@ func WithCluster(ctx context.Context, cluster types.Cluster) context.Context {
 func ClusterFor(ctx context.Context) types.Cluster {
 	return generics.Cast[types.Cluster](ctx.Value(&key))
 }
+
+var nkey = "clustername"
+
+func WithClusterName(ctx context.Context, cluster string) context.Context {
+	return context.WithValue(ctx, &nkey, cluster)
+}
+
+func ClusterNameFor(ctx context.Context) string {
+	return generics.Cast[string](ctx.Value(&key))
+
+}

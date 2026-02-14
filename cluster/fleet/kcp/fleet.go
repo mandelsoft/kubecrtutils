@@ -33,7 +33,10 @@ func New(t types.FleetType, name, id string, cfg *rest.Config, endpointSliceName
 	if err != nil {
 		return nil, err
 	}
-	base := cluster2.NewClusterForCRTCluster(name+"#", cl)
+	base, err := cluster2.NewClusterForCRTCluster(name+"#", cl)
+	if err != nil {
+		return nil, err
+	}
 	conv := base.GetTypeConverter()
 	p, err := apiexport.New(cfg, endpointSliceName, options)
 	if err != nil {
@@ -51,6 +54,7 @@ func New(t types.FleetType, name, id string, cfg *rest.Config, endpointSliceName
 			log:       options.Log,
 		},
 	}
+	f.registrations.fleet = f
 	f.Support = fpi.NewSupport(f, t, name, id, options.Scheme, base, &f.wrapper)
 	f.wrapper.registrations = &f.registrations
 	return f, nil
@@ -141,6 +145,7 @@ type registrations struct {
 	clusters  map[string]types.Cluster
 	aware     multicluster.Aware
 	log       *logr.Logger
+	fleet     types.Fleet
 }
 
 func (r *registrations) GetClusterNames() []string {
@@ -157,8 +162,12 @@ func (r *registrations) GetCluster(name string) types.Cluster {
 
 func (r *registrations) Engage(ctx context.Context, name string, cluster cluster.Cluster) error {
 	id := r.id.Compose(name)
+	cl, err := cluster2.NewClusterForCRTCluster(r.Compose(name), cluster, r.converter, id)
+	if err != nil {
+		return err
+	}
 	r.lock.Lock()
-	r.clusters[name] = cluster2.NewClusterForCRTCluster(r.Compose(name), cluster, r.converter, id)
+	r.clusters[name] = fpi.NewCluster(r.fleet, cl)
 	r.lock.Unlock()
 
 	r.log.Info("engage fleet cluster {{cluster}} for {{fleet}}", "cluster", name, "fleet", r.GetName())

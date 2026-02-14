@@ -9,6 +9,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/internal"
 	"github.com/mandelsoft/logging"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
@@ -77,6 +78,8 @@ type Cluster interface {
 	client.Client
 	cluster.Cluster
 
+	WaitForCacheSync(context.Context) bool
+
 	Unwrap() Cluster
 	GetCluster() cluster.Cluster
 
@@ -95,6 +98,8 @@ type Clusters interface {
 type Index interface {
 	GetName() string
 	GetCluster() ClusterEquivalent
+	GetGVK() schema.GroupVersionKind
+	
 	GetList(ctx context.Context, namespace, key string) (client.ObjectList, error)
 
 	ForEachItem(ctx context.Context, namespace, key string, action func(ctx context.Context, obj runtime.Object) error) error

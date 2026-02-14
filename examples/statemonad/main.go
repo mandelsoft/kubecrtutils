@@ -109,7 +109,7 @@ func helper[V any](t *BinTree[V]) State[int, *BinTree[Numbered[V]]] {
 			helper(t.left),
 			func(nleft *BinTree[Numbered[V]]) State[int, *BinTree[Numbered[V]]] {
 				return andThen[int, int, *BinTree[Numbered[V]]](
-					get[int],
+					get,
 					func(n int) State[int, *BinTree[Numbered[V]]] {
 						return andThen[int, Unit, *BinTree[Numbered[V]]](
 							set(n+1),

@@ -5,7 +5,6 @@ import (
 	"sync"
 
 	"k8s.io/client-go/util/workqueue"
-	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
@@ -35,13 +34,6 @@ func (e *typedenqueue[T]) Start(ctx context.Context, w workqueue.TypedRateLimiti
 	}
 	e.queues = append(e.queues, w)
 	return nil
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-func (e *typedenqueue[T]) AddToController(c *builder.TypedBuilder[T]) *builder.TypedBuilder[T] {
-	c.WatchesRawSource(e)
-	return c
 }
 
 ////////////////////////////////////////////////////////////////////////////////

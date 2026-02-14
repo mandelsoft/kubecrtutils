@@ -30,11 +30,12 @@ type _cluster struct {
 	converter managedfields.TypeConverter
 	start     sync.Once
 	indices   map[string]Index
+	sync      sync.Once
 }
 
 var _ SchemeProvider = (*_cluster)(nil)
 
-func NewClusterForCRTCluster(name string, c cluster.Cluster, opts ...any) Cluster {
+func NewClusterForCRTCluster(name string, c cluster.Cluster, opts ...any) (Cluster, error) {
 
 	id := name
 	var cl client.Client
@@ -52,7 +53,7 @@ func NewClusterForCRTCluster(name string, c cluster.Cluster, opts ...any) Cluste
 		case client.Client:
 			cl = v
 		default:
-			return nil
+			return nil, fmt.Errorf("unknown option type %T", v)
 		}
 	}
 
@@ -61,7 +62,7 @@ func NewClusterForCRTCluster(name string, c cluster.Cluster, opts ...any) Cluste
 			var err error
 			conv, err = merge.NewConverterV3(c.GetConfig())
 			if err != nil {
-				return nil
+				return nil, fmt.Errorf("cannot create converter: %w", err)
 			}
 		}
 		cl = c.GetClient()
@@ -76,7 +77,7 @@ func NewClusterForCRTCluster(name string, c cluster.Cluster, opts ...any) Cluste
 		indices:   map[string]Index{},
 	}
 	r.TypedMux = enqueue.NewTypedMux[mcreconcile.Request](c.GetScheme(), r.createRequest)
-	return r
+	return r, nil
 }
 
 func NewCluster(name string, config *config.Config, opts ...cluster.Option) (Cluster, error) {
@@ -136,7 +137,7 @@ func (c *_cluster) AsFleet() types.Fleet {
 	return nil
 }
 
-func (c *_cluster) Filter(clusterName string, cluster cluster.Cluster) bool {
+func (c *_cluster) Filter(clusterName string, _ cluster.Cluster) bool {
 	return c.Match(clusterName)
 }
 
@@ -174,7 +175,7 @@ func (c *_cluster) GetTypeConverter() managedfields.TypeConverter {
 	return c.converter
 }
 
-func (c *_cluster) createRequest(ctx context.Context, key client.ObjectKey) (mcreconcile.Request, error) {
+func (c *_cluster) createRequest(_ context.Context, key client.ObjectKey) (mcreconcile.Request, error) {
 	return mcreconcile.Request{ClusterName: c.GetName(), Request: reconcile.Request{key}}, nil
 }
 
@@ -216,6 +217,14 @@ type cacheWrapper struct {
 // to setup the implicit cluster always created by the manager.
 func (w *cacheWrapper) Start(ctx context.Context) error {
 	return w.cluster.Start(ctx)
+}
+
+func (c *_cluster) WaitForCacheSync(ctx context.Context) bool {
+	b := true
+	c.sync.Do(func() {
+		b = c.GetCache().WaitForCacheSync(ctx)
+	})
+	return b
 }
 
 func (c *_cluster) GetIndex(name string) Index {

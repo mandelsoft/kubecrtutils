@@ -6,16 +6,12 @@ import (
 	"github.com/mandelsoft/goutils/general"
 	"github.com/mandelsoft/goutils/generics"
 	myhandler "github.com/mandelsoft/kubecrtutils/controller/handler"
-	"github.com/mandelsoft/kubecrtutils/owner"
 	"github.com/mandelsoft/kubecrtutils/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/cluster"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	mcreconcile "sigs.k8s.io/multicluster-runtime/pkg/reconcile"
 )
 
-type MapperFactory = func(ctx context.Context, cntr types.Controller) myhandler.MapFuncFactory
+type MapperFactory = func(ctx context.Context, cntr types.Controller) (myhandler.MapFuncFactory, error)
 
 type ResourceTriggerDefinition interface {
 	OnCluster(name string) ResourceTriggerDefinition
@@ -46,40 +42,8 @@ func newTrigger[T client.Object](mapper MapperFactory, desc ...string) *_trigger
 }
 
 func defaultMapperFactory(m myhandler.MapFuncFactory) MapperFactory {
-	return func(ctx context.Context, cntr types.Controller) myhandler.MapFuncFactory {
-		return m
-	}
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-func ResourceTrigger[T client.Object](mapFunc handler.TypedMapFunc[T, mcreconcile.Request], desc ...string) ResourceTriggerDefinition {
-	return newTriggerF[T](
-		myhandler.MapFuncFactoryWithClusterCompletion(ConvertMapFunc[T, mcreconcile.Request](mapFunc)),
-		desc...)
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-func LocalResourceTrigger[T client.Object](mapFunc handler.TypedMapFunc[T, reconcile.Request], desc ...string) ResourceTriggerDefinition {
-	return newTriggerF[T](
-		myhandler.MapFuncFactoryWithClusterInjection(ConvertMapFunc[T, reconcile.Request](mapFunc)),
-		desc...)
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-func OwnerTrigger[T client.Object]() ResourceTriggerDefinition {
-	return newTrigger[T](
-		ownerFunc[T],
-		"owner trigger",
-	)
-}
-
-func ownerFunc[T client.Object](ctx context.Context, c types.Controller) myhandler.MapFuncFactory {
-	return func(clusterName string, _ cluster.Cluster) handler.TypedMapFunc[client.Object, mcreconcile.Request] {
-		cl := c.GetControllerManager().MapTechnicalName(clusterName)
-		return owner.MapOwnerToRequestByObject(owner.NewHandler(cl), owner.MatcherFor(c.GetCluster()), c.GetCluster(), cl.AsCluster(), c.GetResource())
+	return func(ctx context.Context, cntr types.Controller) (myhandler.MapFuncFactory, error) {
+		return m, nil
 	}
 }
 
