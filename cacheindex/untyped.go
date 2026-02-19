@@ -19,9 +19,10 @@ type index struct {
 	cluster     types.ClusterEquivalent
 	listFactory func() (client.ObjectList, error)
 	gvk         schema.GroupVersionKind
+	proto       client.Object
 }
 
-func NewDefaultIndex(name string, cluster types.ClusterEquivalent, proto runtime.Object) (Index, error) {
+func NewDefaultIndex(name string, cluster types.ClusterEquivalent, proto client.Object) (Index, error) {
 	fac, err := createListFactoryFromObject(cluster.GetScheme(), proto)
 	if err != nil {
 		return nil, err
@@ -34,12 +35,21 @@ func NewDefaultIndex(name string, cluster types.ClusterEquivalent, proto runtime
 		name:        name,
 		cluster:     cluster,
 		gvk:         gvk,
+		proto:       proto,
 		listFactory: fac,
 	}, nil
 }
 
 func (i *index) GetName() string {
 	return i.name
+}
+
+func (i *index) GetEffective() Index {
+	return i
+}
+
+func (i *index) GetResource() client.Object {
+	return i.proto
 }
 
 func (i *index) GetCluster() types.ClusterEquivalent {

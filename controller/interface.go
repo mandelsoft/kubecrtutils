@@ -7,9 +7,10 @@ import (
 )
 
 type Controllers = types.Controllers
+type Controller = types.Controller
 
-type Controller[P kubecrtutils.ObjectPointer[T], T any] interface {
-	types.Controller
+type TypedController[P kubecrtutils.ObjectPointer[T], T any] interface {
+	Controller
 	GetDefinition() TypedDefinition[P, T]
-	GetTypedIndex(name string) cacheindex.TypedIndex[T]
+	GetLocalIndex(name string) cacheindex.TypedIndex[T]
 }

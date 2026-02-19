@@ -15,6 +15,7 @@ type Definitions[T Named, D any] interface {
 	Get(name string) T
 	GetError() error
 	Elements(yield func(string, T) bool)
+	Len() int
 }
 
 type DefinitionsImpl[T Named, D any] struct {

@@ -3,6 +3,7 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"sync"
 
 	"github.com/mandelsoft/goutils/general"
@@ -12,6 +13,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/merge"
 	"github.com/mandelsoft/kubecrtutils/types"
 	"k8s.io/apimachinery/pkg/util/managedfields"
+	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/cluster"
@@ -31,6 +33,7 @@ type _cluster struct {
 	start     sync.Once
 	indices   map[string]Index
 	sync      sync.Once
+	apiServer *url.URL
 }
 
 var _ SchemeProvider = (*_cluster)(nil)
@@ -40,7 +43,7 @@ func NewClusterForCRTCluster(name string, c cluster.Cluster, opts ...any) (Clust
 	id := name
 	var cl client.Client
 	var conv managedfields.TypeConverter
-
+	var apiServer *url.URL
 	for _, o := range opts {
 		if o == nil {
 			continue
@@ -52,6 +55,8 @@ func NewClusterForCRTCluster(name string, c cluster.Cluster, opts ...any) (Clust
 			conv = v
 		case client.Client:
 			cl = v
+		case *url.URL:
+			apiServer = v
 		default:
 			return nil, fmt.Errorf("unknown option type %T", v)
 		}
@@ -75,6 +80,7 @@ func NewClusterForCRTCluster(name string, c cluster.Cluster, opts ...any) (Clust
 		id:        id,
 		converter: conv,
 		indices:   map[string]Index{},
+		apiServer: apiServer,
 	}
 	r.TypedMux = enqueue.NewTypedMux[mcreconcile.Request](c.GetScheme(), r.createRequest)
 	return r, nil
@@ -115,6 +121,14 @@ func (c *_cluster) GetInfo() string {
 
 func (c *_cluster) GetTypeInfo() string {
 	return "cluster"
+}
+
+func (c *_cluster) GetAPIServerURL() (*url.URL, error) {
+	if c.apiServer != nil {
+		return c.apiServer, nil
+	}
+	u, _, err := rest.DefaultServerUrlFor(c.GetConfig())
+	return u, err
 }
 
 func (c *_cluster) Unwrap() Cluster {

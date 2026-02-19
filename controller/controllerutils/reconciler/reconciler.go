@@ -19,6 +19,7 @@ import (
 	builder2 "sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	mcreconcile "sigs.k8s.io/multicluster-runtime/pkg/reconcile"
 )
 
 type CRTReconciler interface {
@@ -54,12 +55,11 @@ type BaseRequest[T client.Object] struct {
 	record.EventRecorder
 	context.Context
 	logging.Logger
-	reconcile.Request
-	controller  types.Controller
-	clusterName string
-	Object      T
-	Orig        T
-	After       time.Duration
+	mcreconcile.Request
+	controller types.Controller
+	Object     T
+	Orig       T
+	After      time.Duration
 }
 
 func (r *BaseRequest[T]) GenerateNameFor(tgt, prefix string, len ...int) string {
@@ -72,10 +72,6 @@ func (r *BaseRequest[T]) GetController() types.Controller {
 
 func (r *BaseRequest[T]) GetObject() T {
 	return r.Object
-}
-
-func (r *BaseRequest[T]) GetClusterName() string {
-	return r.clusterName
 }
 
 func (r *BaseRequest[T]) GetOrig() T {
@@ -135,7 +131,7 @@ func (r *DefaultReconcileRequest[T, R]) Reconcile() myreconcile.Problem {
 
 type ReconciliationByReconcileFunc[P kubecrtutils.ObjectPointer[T], T any] func(request ReconcileRequest[P]) myreconcile.Problem
 
-func (f ReconciliationByReconcileFunc[P, T]) CreateReconciler(ctx context.Context, controller controller.Controller[P, T], b *builder2.Builder) (reconcile.Reconciler, error) {
+func (f ReconciliationByReconcileFunc[P, T]) CreateReconciler(ctx context.Context, controller controller.TypedController[P, T], b *builder2.Builder) (reconcile.Reconciler, error) {
 	return CRTReconcilerFor[P, T](controller, &defaultReconciler[P, T]{f}, 0), nil
 }
 
@@ -163,7 +159,7 @@ type crtReconciler[T client.Object] struct {
 
 var _ CRTReconciler = (*crtReconciler[client.Object])(nil)
 
-func CRTReconcilerFor[P kubecrtutils.ObjectPointer[T], T any](c controller.Controller[P, T], r Reconciler[P], after ...time.Duration) CRTReconciler {
+func CRTReconcilerFor[P kubecrtutils.ObjectPointer[T], T any](c controller.TypedController[P, T], r Reconciler[P], after ...time.Duration) CRTReconciler {
 	return &crtReconciler[P]{
 		name:       c.GetName(),
 		logger:     c.GetLogger(),
@@ -202,10 +198,9 @@ func (d *crtReconciler[T]) Reconcile(ctx context.Context, request reconcile.Requ
 		controller:    d.controller,
 		Context:       ctx,
 		Cluster:       cl,
-		clusterName:   clusterName,
 		EventRecorder: cl.GetEventRecorderFor(d.name),
 		Logger:        d.logger.WithName(request.String()).WithValues("object", request.NamespacedName, "cluster", cl.GetName(), "effcluster", cl.GetEffective().GetName()),
-		Request:       request,
+		Request:       mcreconcile.Request{request, clusterName},
 		After:         d.after,
 	}
 

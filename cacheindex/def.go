@@ -17,8 +17,14 @@ type IndexerFunc[T client.Object] = func(T) []string
 type Definition interface {
 	GetName() string
 	GetTarget() string
+	GetResource() client.Object
 	GetIndexerFunc() client.IndexerFunc
 	Apply(ctx context.Context, set Clusters, logger logging.Logger) (types.Index, error)
+}
+
+type Reference interface {
+	Definition
+	IsRef() bool
 }
 
 type TypedDefinition[P kubecrtutils.ObjectPointer[T], T any] interface {
@@ -33,7 +39,24 @@ type _definition[P kubecrtutils.ObjectPointer[T], T any] struct {
 	idxfunc IndexerFunc[P]
 }
 
-func NewDefinition[P kubecrtutils.ObjectPointer[T], T any](name string, target string, idxfunc IndexerFunc[P]) TypedDefinition[P, T] {
+type _reference[P kubecrtutils.ObjectPointer[T], T any] struct {
+	_definition[P, T]
+}
+
+func (r *_reference[P, T]) IsRef() bool {
+	return true
+}
+
+func Ref[P kubecrtutils.ObjectPointer[T], T any](name string, target string) Reference {
+	return &_reference[P, T]{_definition[P, T]{
+		Element: internal.NewElement(name),
+		target:  target,
+		idxfunc: nil,
+		proto:   generics.ObjectFor[P](),
+	}}
+}
+
+func Define[P kubecrtutils.ObjectPointer[T], T any](name string, target string, idxfunc IndexerFunc[P]) TypedDefinition[P, T] {
 	return &_definition[P, T]{
 		Element: internal.NewElement(name),
 		target:  target,
@@ -44,6 +67,10 @@ func NewDefinition[P kubecrtutils.ObjectPointer[T], T any](name string, target s
 
 func (d *_definition[P, T]) GetTarget() string {
 	return d.target
+}
+
+func (d *_definition[P, T]) GetResource() client.Object {
+	return d.proto
 }
 
 func (d *_definition[P, T]) GetIndexerFunc() client.IndexerFunc {
@@ -63,7 +90,7 @@ func (d *_definition[P, T]) Apply(ctx context.Context, set Clusters, logger logg
 
 	gk, err := kubecrtutils.GKForObject(c, d.proto)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot determine group/kind for %T: %w", d.proto, err)
 	}
 
 	i := func(obj client.Object) []string {

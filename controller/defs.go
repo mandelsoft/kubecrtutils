@@ -30,11 +30,19 @@ func NewDefinitions() Definitions {
 }
 
 func (d *_definitions) Apply(ctx context.Context, mgr types.ControllerManager) (Controllers, error) {
+	mgr.GetLogger().Info("configure controller defined indices...")
+	for _, c := range d.Elements {
+		err := c.CreateIndices(ctx, nil, mgr)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	controllers := NewControllers()
 	mgr.GetLogger().Info("configure controllers...")
 	// Step 1: create controllers and their environment like indices
 	for n, i := range d.Elements {
-		c, err := i.CreateController(ctx, mgr)
+		c, err := i.CreateController(ctx, nil, mgr)
 		if err != nil {
 			return nil, fmt.Errorf("controller %q: %w", n, err)
 		}

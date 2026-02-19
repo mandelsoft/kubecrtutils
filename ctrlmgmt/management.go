@@ -28,35 +28,19 @@ func NewControllerManagerByOpts(ctx context.Context, opts flagutils.OptionSetPro
 		return nil, fmt.Errorf("management definition: %w", def.GetError())
 	}
 
+	mopts := manageropts.From(opts)
+	if mopts == nil {
+		return nil, fmt.Errorf("no manager options found")
+	}
+
 	copts := cluster.From(opts)
 	if copts == nil {
 		return nil, fmt.Errorf("no clusters found in options")
 	}
 	clusters := copts.GetClusters()
 
-	mopts := manageropts.From(opts)
-	if mopts == nil {
-		return nil, fmt.Errorf("no manager options found")
-	}
-
-	manager, err := mopts.GetManager(ctx, opts)
-	if err != nil {
-		return nil, fmt.Errorf("settingup manager: %w", err)
-	}
-
 	logger := kubecrtutils.LogContext.WithContext(logging.NewRealm(kubecrtutils.Realm.Name() + "/" + def.GetName())).Logger()
-
 	logger.Info("configure controller manager {{cm}}", "cm", def.GetName())
-	var indices cacheindex.Indices
-	iopts := cacheindex.From(opts)
-	if iopts != nil {
-		indices, err = iopts.GetIndices(ctx, clusters, logger)
-		if err != nil {
-			return nil, fmt.Errorf("settingup indices: %w", err)
-		}
-	} else {
-		indices = cacheindex.NewIndices()
-	}
 
 	list := []string{}
 	defcluster := false
@@ -93,6 +77,28 @@ func NewControllerManagerByOpts(ctx context.Context, opts flagutils.OptionSetPro
 		}
 	}
 
+	manager, err := mopts.GetManager(ctx, opts)
+	if err != nil {
+		return nil, fmt.Errorf("settingup manager: %w", err)
+	}
+
+	cntropts := controller.From(opts)
+	if cntropts == nil {
+		return nil, fmt.Errorf("no controller definitions found")
+	}
+
+	var indices cacheindex.Indices
+	iopts := cacheindex.From(opts)
+	if iopts != nil && iopts.Len() > 0 {
+		logger.Info("configure global indices...")
+		indices, err = iopts.GetIndices(ctx, clusters, logger)
+		if err != nil {
+			return nil, fmt.Errorf("settingup indices: %w", err)
+		}
+	} else {
+		indices = cacheindex.NewIndices()
+	}
+
 	cm := &_controllermanager{
 		Element:    internal.NewElement(def.GetName()),
 		logger:     logger,
@@ -103,10 +109,6 @@ func NewControllerManagerByOpts(ctx context.Context, opts flagutils.OptionSetPro
 		definition: def,
 	}
 
-	cntropts := controller.From(opts)
-	if cntropts == nil {
-		return nil, fmt.Errorf("no controller definitions found")
-	}
 	cntr, err := cntropts.Apply(ctx, cm)
 	if err != nil {
 		return nil, fmt.Errorf("settingup controllers: %w", err)

@@ -24,6 +24,6 @@ func WithClusterName(ctx context.Context, cluster string) context.Context {
 }
 
 func ClusterNameFor(ctx context.Context) string {
-	return generics.Cast[string](ctx.Value(&key))
+	return generics.Cast[string](ctx.Value(&nkey))
 
 }

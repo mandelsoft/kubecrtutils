@@ -1,6 +1,7 @@
 package hostedzone
 
 import (
+	"github.com/mandelsoft/goutils/funcs"
 	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconcile"
 	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconciler"
 	"github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
@@ -19,6 +20,7 @@ func (r *ReconcileRequest) Reconcile() reconcile.Problem {
 			Namespace: r.Namespace,
 		},
 	}
+	r.Info("URL {{url}}", "url", funcs.First(r.GetAPIServerURL()))
 	_ = other
 	r.EnqueueByObject(r.Context, other)
 	return reconcile.Succeeded()

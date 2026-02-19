@@ -2,6 +2,7 @@ package types
 
 import (
 	"context"
+	"net/url"
 
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/kubecrtutils/cluster/config"
@@ -21,6 +22,13 @@ import (
 	"sigs.k8s.io/multicluster-runtime/pkg/multicluster"
 	mcreconcile "sigs.k8s.io/multicluster-runtime/pkg/reconcile"
 )
+
+type ClusterMatcher func(clusterId string) (clusterName string, equal bool)
+
+type OwnerHandler interface {
+	SetOwner(cluster Cluster, owner client.Object, target Cluster, slave client.Object) error
+	GetOwner(cmatch ClusterMatcher, target Cluster, obj client.Object, kind schema.GroupKind) (string, *client.ObjectKey)
+}
 
 type ControllerManager interface {
 	GetName() string
@@ -46,9 +54,16 @@ type ControllerDefinition interface {
 	GetError() error
 	GetOptions() flagutils.Options
 
+	// CreateIndices creates and exports locally defined indices prior to controller creation.
+	CreateIndices(ctx context.Context, mapping ControllerMappings, mgr ControllerManager) error
+
 	// CreateController handles the global definitions and provides
 	// a Controller
-	CreateController(ctx context.Context, mgr ControllerManager) (Controller, error)
+	CreateController(ctx context.Context, mapping ControllerMappings, mgr ControllerManager) (Controller, error)
+}
+
+type MappedControllerDefinition interface {
+	ControllerDefinition
 }
 
 type Controller interface {
@@ -62,6 +77,7 @@ type Controller interface {
 	GetRecoder(ctx context.Context) record.EventRecorder
 	GetReconciler() reconcile.Reconciler
 	GetIndex(name string) Index
+	GetOwnerHandler() OwnerHandler
 
 	Complete(ctx context.Context) error
 
@@ -77,6 +93,8 @@ type Cluster interface {
 
 	client.Client
 	cluster.Cluster
+	// Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error
+	// List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error
 
 	WaitForCacheSync(context.Context) bool
 
@@ -88,6 +106,8 @@ type Cluster interface {
 	GetTypeConverter() managedfields.TypeConverter
 
 	IsSameAs(ClusterEquivalent) bool
+
+	GetAPIServerURL() (*url.URL, error)
 }
 
 type Clusters interface {
@@ -99,11 +119,14 @@ type Index interface {
 	GetName() string
 	GetCluster() ClusterEquivalent
 	GetGVK() schema.GroupVersionKind
-	
+
 	GetList(ctx context.Context, namespace, key string) (client.ObjectList, error)
 
 	ForEachItem(ctx context.Context, namespace, key string, action func(ctx context.Context, obj runtime.Object) error) error
 	Trigger(ctx context.Context, namespace, key string) error
+
+	GetEffective() Index
+	GetResource() client.Object
 }
 
 type Indices interface {

@@ -2,12 +2,13 @@ package kcp
 
 import (
 	"context"
+	"path"
 	"sync"
 
 	"github.com/go-logr/logr"
 	"github.com/kcp-dev/multicluster-provider/apiexport"
 	"github.com/mandelsoft/goutils/maputils"
-	cluster2 "github.com/mandelsoft/kubecrtutils/cluster"
+	mycluster "github.com/mandelsoft/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubecrtutils/cluster/fleet"
 	"github.com/mandelsoft/kubecrtutils/cluster/fleet/fpi"
 	"github.com/mandelsoft/kubecrtutils/types"
@@ -33,7 +34,7 @@ func New(t types.FleetType, name, id string, cfg *rest.Config, endpointSliceName
 	if err != nil {
 		return nil, err
 	}
-	base, err := cluster2.NewClusterForCRTCluster(name+"#", cl)
+	base, err := mycluster.NewClusterForCRTCluster(name+"#", cl)
 	if err != nil {
 		return nil, err
 	}
@@ -162,7 +163,22 @@ func (r *registrations) GetCluster(name string) types.Cluster {
 
 func (r *registrations) Engage(ctx context.Context, name string, cluster cluster.Cluster) error {
 	id := r.id.Compose(name)
-	cl, err := cluster2.NewClusterForCRTCluster(r.Compose(name), cluster, r.converter, id)
+	u, err := r.fleet.GetBaseCluster().GetAPIServerURL()
+	if err != nil {
+		return err
+	}
+	n := *u
+	p := u.Path
+
+	for p != "" {
+		p, d := path.Split(p)
+		if d == "clusters" {
+			n.Path = path.Join(p, d, name)
+			p = ""
+		}
+	}
+
+	cl, err := mycluster.NewClusterForCRTCluster(r.Compose(name), cluster, r.converter, id, &n)
 	if err != nil {
 		return err
 	}

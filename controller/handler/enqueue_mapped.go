@@ -20,7 +20,7 @@ func EnqueueRequestFromMapFunc(fn MapFunc) mchandler.EventHandlerFunc {
 
 type MapFuncFactory = TypedMapFuncFactory[client.Object, mcreconcile.Request]
 
-type TypedMapFuncFactory[object client.Object, request mcreconcile.ClusterAware[request]] = func(clusterName string, cluster cluster.Cluster) handler.TypedMapFunc[object, request]
+type TypedMapFuncFactory[object client.Object, request comparable] = func(clusterName string, cluster cluster.Cluster) handler.TypedMapFunc[object, request]
 
 func EnqueueRequestFromMapFuncFactory(fn MapFuncFactory) mchandler.EventHandlerFunc {
 	return func(clusterName string, cluster cluster.Cluster) EventHandler {

@@ -2,6 +2,7 @@ package cacheindex
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/mandelsoft/kubecrtutils/types"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -20,6 +21,10 @@ type _typedIndex[T any] struct {
 }
 
 var _ TypedIndex[any] = (*_typedIndex[any])(nil)
+
+func (i *_typedIndex[T]) GetEffective() Index {
+	return i
+}
 
 func (i *_typedIndex[T]) GetTyped(ctx context.Context, namespace string, key string) ([]T, error) {
 	list, err := i.GetList(ctx, namespace, key)
@@ -49,4 +54,21 @@ func GetItemList[T any](list client.ObjectList) ([]T, error) {
 		return nil, err
 	}
 	return *(ptr).(*[]T), nil
+}
+
+type IndexProvider interface {
+	GetIndex(name string) Index
+}
+
+func GetIndexFrom[T any](provider IndexProvider, name string) (TypedIndex[T], error) {
+	i := provider.GetIndex(name)
+	if i == nil {
+		return nil, fmt.Errorf("no index for %q found", name)
+	}
+	t, ok := i.(TypedIndex[T])
+	if !ok {
+		var e T
+		return nil, fmt.Errorf("type mismatch for %q: %T expected, but found %T", name, &e, i.GetResource())
+	}
+	return t, nil
 }

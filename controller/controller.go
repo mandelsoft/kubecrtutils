@@ -39,7 +39,8 @@ type _controller[P kubecrtutils.ObjectPointer[T], T any] struct {
 	cluster              types.ClusterEquivalent
 	gk                   schema.GroupKind
 	recorder             recorderFunc
-	indices              map[string]cacheindex.TypedIndex[T]
+	localIndices         map[string]cacheindex.TypedIndex[T]
+	allIndices           map[string]cacheindex.Index
 	reconciler           reconcile.Reconciler
 	ohandler             owner.Handler
 }
@@ -48,7 +49,7 @@ func (c *_controller[P, T]) GetName() string {
 	return c.definition.GetName()
 }
 
-func (c *_controller[P, T]) GetOwnerhandler() owner.Handler {
+func (c *_controller[P, T]) GetOwnerHandler() owner.Handler {
 	return c.ohandler
 }
 
@@ -84,13 +85,13 @@ func (c *_controller[P, T]) GetRecoder(ctx context.Context) record.EventRecorder
 	return c.recorder(ctx)
 }
 
-func (c *_controller[P, T]) GetTypedIndex(name string) cacheindex.TypedIndex[T] {
-	i := c.indices[name]
+func (c *_controller[P, T]) GetLocalIndex(name string) cacheindex.TypedIndex[T] {
+	i := c.localIndices[name]
 	return i
 }
 
 func (c *_controller[P, T]) GetIndex(name string) cluster.Index {
-	return c.GetTypedIndex(name)
+	return c.allIndices[name]
 }
 
 func (c *_controller[P, T]) GetReconciler() reconcile.Reconciler {
@@ -174,7 +175,7 @@ func (c *_controller[P, T]) GenerateNameFor(ctx context.Context, tgt types.Clust
 ////////////////////////////////////////////////////////////////////////////////
 
 type reconcileWrapper[P kubecrtutils.ObjectPointer[T], T any] struct {
-	controller Controller[P, T]
+	controller TypedController[P, T]
 	reconciler reconcile.Reconciler
 }
 
@@ -185,7 +186,7 @@ func (r *reconcileWrapper[P, T]) Reconcile(ctx context.Context, request mcreconc
 
 ////////////////////////////////////////////////////////////////////////////////
 
-func watchWrapper[P kubecrtutils.ObjectPointer[T], T any](controller Controller[P, T], factory mchandler.EventHandlerFunc) mchandler.EventHandlerFunc {
+func watchWrapper[P kubecrtutils.ObjectPointer[T], T any](controller TypedController[P, T], factory mchandler.EventHandlerFunc) mchandler.EventHandlerFunc {
 	return func(clusterName string, cluster sigcluster.Cluster) mchandler.EventHandler {
 		cl := controller.GetControllerManager().MapTechnicalName(clusterName).AsCluster()
 		return &wrapperHandler{cl, factory(clusterName, cluster)}

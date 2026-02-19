@@ -10,13 +10,13 @@ import (
 	"github.com/mandelsoft/kubecrtutils/cluster/fleet/fpi"
 	"github.com/mandelsoft/kubecrtutils/merge"
 	"github.com/mandelsoft/kubecrtutils/objutils"
-	types2 "github.com/mandelsoft/kubecrtutils/types"
+	"github.com/mandelsoft/kubecrtutils/types"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer/yaml"
-	"k8s.io/apimachinery/pkg/types"
+	apimachtypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -25,11 +25,11 @@ type OperationContext interface {
 	context.Context
 	Logger
 	GetFieldManager() string
-	Modify(cluster types2.Cluster, obj client.Object) error
+	Modify(cluster types.Cluster, obj client.Object) error
 }
 
-type ObjectModifier = types2.ObjectModifier
-type ObjectModifierFunc = types2.ObjectModifierFunc
+type ObjectModifier = types.ObjectModifier
+type ObjectModifierFunc = types.ObjectModifierFunc
 
 type _defaultOperationContext struct {
 	context.Context
@@ -43,7 +43,7 @@ func aggregatedModifier(mod ...ObjectModifier) ObjectModifier {
 		return mod[0]
 	}
 	// assure non-nil modifier
-	return ObjectModifierFunc(func(cluster types2.Cluster, obj client.Object) error {
+	return ObjectModifierFunc(func(cluster types.Cluster, obj client.Object) error {
 		for _, m := range mod {
 			err := m.Modify(cluster, obj)
 			if err != nil {
@@ -67,7 +67,7 @@ func (o *_defaultOperationContext) GetFieldManager() string {
 	return o.fieldManager
 }
 
-func (o *_defaultOperationContext) Modify(cluster types2.Cluster, obj client.Object) error {
+func (o *_defaultOperationContext) Modify(cluster types.Cluster, obj client.Object) error {
 	return o.modifer.Modify(cluster, obj)
 }
 
@@ -241,7 +241,7 @@ func ClientSideApply(c Cluster, ctx OperationContext, manifest []byte, mod ...*M
 		return nil, err
 	}
 
-	rawPatch := client.RawPatch(types.MergePatchType, patchData)
+	rawPatch := client.RawPatch(apimachtypes.MergePatchType, patchData)
 	if string(patchData) == "{}" {
 		ctx.Info("resource uptodate", "cluster", c.GetName(), "name", desired.GetName(), "namespace", desired.GetNamespace(), "groupkind", desired.GroupVersionKind())
 
@@ -266,7 +266,7 @@ func WithModification(ctx OperationContext, mod ...ObjectModifier) OperationCont
 	}
 }
 
-func (w *modificationWrapper) Modify(cluster types2.Cluster, obj client.Object) error {
+func (w *modificationWrapper) Modify(cluster types.Cluster, obj client.Object) error {
 	err := w.OperationContext.Modify(cluster, obj)
 	if err != nil {
 		return err

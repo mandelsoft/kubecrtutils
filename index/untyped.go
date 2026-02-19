@@ -15,6 +15,7 @@ type UntypedIndex interface {
 	UsersFor(r string, b client.ObjectKey) sets.Set[client.ObjectKey]
 	UsedBy(r string, a client.ObjectKey) sets.Set[client.ObjectKey]
 	Clear(r string) bool
+	IsEmpty() bool
 }
 
 type untyped struct {
@@ -26,6 +27,12 @@ func NewUntyped() UntypedIndex {
 	return &untyped{
 		relations: make(map[string]*relation),
 	}
+}
+
+func (u *untyped) IsEmpty() bool {
+	u.lock.Lock()
+	defer u.lock.Unlock()
+	return len(u.relations) == 0
 }
 
 func (u *untyped) Add(r string, a, b client.ObjectKey) bool {

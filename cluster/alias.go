@@ -95,6 +95,9 @@ type _clusterLikeAlias struct {
 }
 
 func NewClusterLikeAlias(name string, c ClusterEquivalent) ClusterEquivalent {
+	if c.GetName() == name {
+		return c
+	}
 	return &_clusterLikeAlias{
 		ClusterEquivalent: c,
 		name:              name,

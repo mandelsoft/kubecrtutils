@@ -30,7 +30,9 @@ func indexMappingFactory[T client.Object](indexName string) MapperFactory {
 		if idx == nil {
 			return nil, fmt.Errorf("index %q not found", indexName)
 		}
+		log := c.GetLogger().WithName("indextrigger").WithName(indexName).WithValues("index", indexName, "gkv", idx.GetGVK())
 		return func(clusterName string, cl cluster.Cluster) handler.TypedMapFunc[client.Object, mcreconcile.Request] {
+			conv := LiftRequest(clusterName)
 			return func(ctx context.Context, obj client.Object) []mcreconcile.Request {
 				key := client.ObjectKeyFromObject(obj).String()
 				list := &unstructured.UnstructuredList{}
@@ -39,12 +41,11 @@ func indexMappingFactory[T client.Object](indexName string) MapperFactory {
 				if err != nil {
 					return nil
 				}
-				return sliceutils.Transform(list.Items, func(u unstructured.Unstructured) mcreconcile.Request {
-					return mcreconcile.Request{
-						ClusterName: clusterName,
-						Request:     reconcile.Request{client.ObjectKeyFromObject(&u)},
-					}
+				result := sliceutils.Transform(list.Items, func(u unstructured.Unstructured) reconcile.Request {
+					return reconcile.Request{client.ObjectKeyFromObject(&u)}
 				})
+				log.Info("trigger indexed for {{object}}: {{triggered}}", "object", key, "triggered", result, "cluster", clusterName)
+				return sliceutils.Transform(result, conv)
 			}
 		}, nil
 	}

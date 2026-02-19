@@ -13,12 +13,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-type ClusterMatcher func(clusterId string) (clusterName string, equal bool)
-
-type Handler interface {
-	SetOwner(cluster types.Cluster, owner client.Object, target types.Cluster, slave client.Object) error
-	GetOwner(cmatch ClusterMatcher, target types.Cluster, obj client.Object, kind schema.GroupKind) (string, *client.ObjectKey)
-}
+type ClusterMatcher = types.ClusterMatcher
+type Handler = types.OwnerHandler
 
 type standard struct {
 	annoType AnnotationType
