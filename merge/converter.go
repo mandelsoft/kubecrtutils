@@ -2,41 +2,55 @@ package merge
 
 import (
 	"strings"
+	"sync"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/openapi"
 	"k8s.io/client-go/openapi3"
 	"k8s.io/client-go/rest"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
-type ObjectMerger struct {
-	converters  Converters
-	scheme      *runtime.Scheme
-	managerName string
+type Converters interface {
+	GetConverter(gvk schema.GroupVersionKind) (managedfields.TypeConverter, error)
 }
 
-func NewObjectMerger(c Converters, scheme *runtime.Scheme, managerName string) (*ObjectMerger, error) {
-	return &ObjectMerger{converters: c, managerName: managerName}, nil
+type converters struct {
+	lock       sync.Mutex
+	client     openapi.Client
+	converters map[schema.GroupVersion]managedfields.TypeConverter
 }
 
-func NewConverterV3(config *rest.Config) (managedfields.TypeConverter, error) {
-	// 1. Setup discovery and the V3 Root
+func NewConverters(config *rest.Config) (Converters, error) {
 	dc, err := discovery.NewDiscoveryClientForConfig(config)
 	if err != nil {
 		return nil, err
 	}
-	v3Client := dc.OpenAPIV3()
+	return &converters{
+		client:     dc.OpenAPIV3(),
+		converters: map[schema.GroupVersion]managedfields.TypeConverter{},
+	}, nil
+}
 
-	// openapi3.NewRoot is the official helper to traverse the V3 discovery
-	root := openapi3.NewRoot(v3Client)
+func (c *converters) GetConverter(gvk schema.GroupVersionKind) (managedfields.TypeConverter, error) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	req := gvk.GroupVersion()
+	tc := c.converters[req]
+	if tc != nil {
+		return tc, nil
+	}
+
+	// 1. openapi3.NewRoot is the official helper to traverse the V3 discovery
+	root := openapi3.NewRoot(c.client)
 
 	definitions := make(map[string]*spec.Schema)
 
 	// 2. Fetch the "Root" which contains all GroupVersions
-	paths, err := v3Client.Paths()
+	paths, err := c.client.Paths()
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +64,7 @@ func NewConverterV3(config *rest.Config) (managedfields.TypeConverter, error) {
 			gvStr = strings.TrimPrefix(gvStr, "api/")
 		}
 		gv, err := schema.ParseGroupVersion(gvStr)
-		if err != nil {
+		if err != nil || gv != req {
 			continue
 		}
 		spec3, err := root.GVSpec(gv)
@@ -64,5 +78,10 @@ func NewConverterV3(config *rest.Config) (managedfields.TypeConverter, error) {
 		}
 	}
 
-	return managedfields.NewTypeConverter(definitions, false)
+	conv, err := managedfields.NewTypeConverter(definitions, false)
+	if err != nil {
+		return nil, err
+	}
+	c.converters[req] = conv
+	return conv, nil
 }

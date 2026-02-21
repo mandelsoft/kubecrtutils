@@ -6,13 +6,13 @@ import (
 	"net/url"
 	"sync"
 
+	"github.com/mandelsoft/goutils/funcs"
 	"github.com/mandelsoft/goutils/general"
 	"github.com/mandelsoft/kubecrtutils/cacheindex"
 	"github.com/mandelsoft/kubecrtutils/cluster/config"
 	"github.com/mandelsoft/kubecrtutils/enqueue"
 	"github.com/mandelsoft/kubecrtutils/merge"
 	"github.com/mandelsoft/kubecrtutils/types"
-	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -29,7 +29,7 @@ type _cluster struct {
 
 	name      string
 	id        string
-	converter managedfields.TypeConverter
+	converter merge.Converters
 	start     sync.Once
 	indices   map[string]Index
 	sync      sync.Once
@@ -42,7 +42,7 @@ func NewClusterForCRTCluster(name string, c cluster.Cluster, opts ...any) (Clust
 
 	id := name
 	var cl client.Client
-	var conv managedfields.TypeConverter
+	var conv merge.Converters
 	var apiServer *url.URL
 	for _, o := range opts {
 		if o == nil {
@@ -51,7 +51,7 @@ func NewClusterForCRTCluster(name string, c cluster.Cluster, opts ...any) (Clust
 		switch v := o.(type) {
 		case string:
 			id = v
-		case managedfields.TypeConverter:
+		case merge.Converters:
 			conv = v
 		case client.Client:
 			cl = v
@@ -65,9 +65,9 @@ func NewClusterForCRTCluster(name string, c cluster.Cluster, opts ...any) (Clust
 	if c != nil {
 		if conv == nil {
 			var err error
-			conv, err = merge.NewConverterV3(c.GetConfig())
+			conv, err = merge.NewConverters(c.GetConfig())
 			if err != nil {
-				return nil, fmt.Errorf("cannot create converter: %w", err)
+				return nil, fmt.Errorf("cluster %v: cannot create converter: %w", funcs.First(rest.DefaultServerUrlFor(c.GetConfig())), err)
 			}
 		}
 		cl = c.GetClient()
@@ -95,7 +95,7 @@ func NewCluster(name string, config *config.Config, opts ...cluster.Option) (Clu
 	if id == "" {
 		id = name
 	}
-	conv, err := merge.NewConverterV3(config.RestConfig)
+	conv, err := merge.NewConverters(config.RestConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +185,7 @@ func (c *_cluster) GetCluster() cluster.Cluster {
 	return c.Cluster
 }
 
-func (c *_cluster) GetTypeConverter() managedfields.TypeConverter {
+func (c *_cluster) GetTypeConverter() merge.Converters {
 	return c.converter
 }
 

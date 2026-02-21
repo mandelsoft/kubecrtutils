@@ -17,7 +17,7 @@ type ReconcilerFactory struct {
 
 func (f *ReconcilerFactory) CreateReconciler(ctx context.Context, controller controller.TypedController[*corednsv1alpha1.HostedZone, corednsv1alpha1.HostedZone], b builder.Builder) (crtreconcile.Reconciler, error) {
 	logger := controller.GetLogger()
-	logger.Info("creating hostedzone reconciler...")
+	logger.Info("  creating hostedzone reconciler...")
 
 	r := &Reconciler{
 		controller: controller,

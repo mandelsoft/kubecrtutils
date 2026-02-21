@@ -43,6 +43,6 @@ func (d *_type) Create(defs cluster.Definitions, def cluster.Definition, config 
 	}
 	return New(d, def.GetName(), general.OptionalNonZeroDefaulted(def.GetName(), config.GetId()), config.RestConfig, cfg.EndpointSlice, apiexport.Options{
 		Scheme: general.OptionalDefaulted(defs.GetScheme(), def.GetScheme()),
-		Log:    generics.PointerTo(log.V(4)),
+		Log:    generics.PointerTo(log.V(0)),
 	})
 }

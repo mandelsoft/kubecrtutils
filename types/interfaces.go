@@ -8,10 +8,10 @@ import (
 	"github.com/mandelsoft/kubecrtutils/cluster/config"
 	"github.com/mandelsoft/kubecrtutils/enqueue"
 	"github.com/mandelsoft/kubecrtutils/internal"
+	"github.com/mandelsoft/kubecrtutils/merge"
 	"github.com/mandelsoft/logging"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -103,7 +103,7 @@ type Cluster interface {
 
 	GetIndex(name string) Index
 
-	GetTypeConverter() managedfields.TypeConverter
+	GetTypeConverter() merge.Converters
 
 	IsSameAs(ClusterEquivalent) bool
 

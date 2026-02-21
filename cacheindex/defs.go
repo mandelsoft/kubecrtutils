@@ -2,6 +2,7 @@ package cacheindex
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/kubecrtutils/internal"
@@ -30,10 +31,10 @@ func NewDefinitions() Definitions {
 
 func (d *_definitions) GetIndices(ctx context.Context, clusters Clusters, logger logging.Logger) (Indices, error) {
 	indices := NewIndices()
-	for _, i := range d.Elements {
+	for n, i := range d.Elements {
 		_, err := i.Apply(ctx, clusters, logger)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("index %q: %w", n, err)
 		}
 	}
 	return indices, nil

@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/mandelsoft/goutils/general"
+	. "github.com/mandelsoft/kubecrtutils/log"
+
 	"github.com/mandelsoft/kubecrtutils"
 	"github.com/mandelsoft/kubecrtutils/cacheindex"
 	"github.com/mandelsoft/kubecrtutils/cluster"
@@ -107,17 +110,17 @@ func (c *_controller[P, T]) Complete(ctx context.Context) error {
 
 	bldr := multiclusterruntime.NewControllerManagedBy(mgr.GetManager()).Named(d.GetName())
 
-	logger.Info("configure reconciling {{kind}} at {{type}} {{cluster}}[[[effcluster}}]", "kind", c.gk, "type", cl.GetTypeInfo(), "cluster", d.GetCluster(), "effcluster", cl.GetEffective().GetName())
+	Info(logger, "  configure reconciling of ", GroupKind(c.gk), " at ", LogicalClusterInfo(c.GetCluster()))
 	bldr = bldr.For(d.GetResource(), mcbuilder.WithPredicates(d.GetWatchPredicates()...), mcbuilder.WithClusterFilter(c.GetCluster().Filter))
 
 	trigger, err := cl.TriggerSource(d.GetResource())
 	if err != nil {
 		return fmt.Errorf("explicit trigger [%s]: %w", c.gk, err)
 	}
-	logger.Info("configure explicit trigger for main resource {{kind}} at cluster {{cluster}}[{{effcluster}}]", "kind", c.gk, "cluster", d.GetCluster(), "effcluster", c.GetCluster().GetEffective().GetName())
+	Info(logger, "  configure explicit trigger for main resource ", GroupKind(c.gk), " at ", LogicalClusterInfo(c.GetCluster()))
 	bldr.WatchesRawSource(trigger)
 
-	logger.Info("configure reconciler")
+	logger.Info("  configure reconciler")
 	r, err := d.GetReconciler().CreateReconciler(ctx, c, abuilder.For(bldr, c.GetCluster()))
 	if err != nil {
 		return err
@@ -139,15 +142,17 @@ func (c *_controller[P, T]) Complete(ctx context.Context) error {
 }
 
 func (c *_controller[P, T]) addTrigger(ctx context.Context, bldr *mcbuilder.Builder, tdef ResourceTriggerDefinition) error {
-	d := c.definition
 	gk, err := kubecrtutils.GKForObject(c.GetCluster(), tdef.GetResource())
 	if err != nil {
 		return fmt.Errorf("cannot determine group kind for %T: %w", tdef.GetResource(), err)
 	}
 
-	target := c.GetClusters().Get(tdef.GetCluster())
-
-	c.logger.Info("configure resource-based trigger for {{resource}}[{{trigger}}] on {{type}} {{cluster}}[{{effcluster}}]}", "trigger", tdef.GetDescription(), "resource", gk, "type", target.GetTypeInfo(), "cluster", d.GetCluster(), "effcluster", target.GetEffective().GetName())
+	cname := general.OptionalNonZeroDefaulted(c.definition.GetCluster(), tdef.GetCluster())
+	target := c.GetClusters().Get(cname)
+	if target == nil {
+		return fmt.Errorf("cannot determine target cluster for %q: %w", cname)
+	}
+	Info(c.logger, "  configure resource-based trigger for ", GroupKind(gk), "[", KeyValue("description", tdef.GetDescription()), "] on ", LogicalClusterInfo(target))
 
 	m, err := tdef.GetMapper()(ctx, c)
 	if err != nil {
@@ -189,29 +194,34 @@ func (r *reconcileWrapper[P, T]) Reconcile(ctx context.Context, request mcreconc
 func watchWrapper[P kubecrtutils.ObjectPointer[T], T any](controller TypedController[P, T], factory mchandler.EventHandlerFunc) mchandler.EventHandlerFunc {
 	return func(clusterName string, cluster sigcluster.Cluster) mchandler.EventHandler {
 		cl := controller.GetControllerManager().MapTechnicalName(clusterName).AsCluster()
-		return &wrapperHandler{cl, factory(clusterName, cluster)}
+		return &wrapperHandler{cl, clusterName, factory(clusterName, cluster)}
 	}
 }
 
 type wrapperHandler struct {
-	cluster types.Cluster
-	handler handler.TypedEventHandler[client.Object, mcreconcile.Request]
+	cluster     types.Cluster
+	clusterName string
+	handler     handler.TypedEventHandler[client.Object, mcreconcile.Request]
 }
 
 var _ handler.TypedEventHandler[client.Object, mcreconcile.Request] = (*wrapperHandler)(nil)
 
+func (w *wrapperHandler) setContext(ctx context.Context) context.Context {
+	return clustercontext.WithCluster(clustercontext.WithClusterName(ctx, w.clusterName), w.cluster)
+}
+
 func (w *wrapperHandler) Create(ctx context.Context, e event.TypedCreateEvent[client.Object], wq workqueue.TypedRateLimitingInterface[mcreconcile.Request]) {
-	w.handler.Create(clustercontext.WithCluster(ctx, w.cluster), e, wq)
+	w.handler.Create(w.setContext(ctx), e, wq)
 }
 
 func (w *wrapperHandler) Update(ctx context.Context, e event.TypedUpdateEvent[client.Object], wq workqueue.TypedRateLimitingInterface[mcreconcile.Request]) {
-	w.handler.Update(clustercontext.WithCluster(ctx, w.cluster), e, wq)
+	w.handler.Update(w.setContext(ctx), e, wq)
 }
 
 func (w *wrapperHandler) Delete(ctx context.Context, e event.TypedDeleteEvent[client.Object], wq workqueue.TypedRateLimitingInterface[mcreconcile.Request]) {
-	w.handler.Delete(clustercontext.WithCluster(ctx, w.cluster), e, wq)
+	w.handler.Delete(w.setContext(ctx), e, wq)
 }
 
 func (w *wrapperHandler) Generic(ctx context.Context, e event.TypedGenericEvent[client.Object], wq workqueue.TypedRateLimitingInterface[mcreconcile.Request]) {
-	w.handler.Generic(clustercontext.WithCluster(ctx, w.cluster), e, wq)
+	w.handler.Generic(w.setContext(ctx), e, wq)
 }

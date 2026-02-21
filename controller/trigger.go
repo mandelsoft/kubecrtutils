@@ -7,6 +7,7 @@ import (
 	"github.com/mandelsoft/goutils/generics"
 	"github.com/mandelsoft/goutils/sliceutils"
 	myhandler "github.com/mandelsoft/kubecrtutils/controller/handler"
+	"github.com/mandelsoft/kubecrtutils/controller/helper"
 	"github.com/mandelsoft/kubecrtutils/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	sigcluster "sigs.k8s.io/controller-runtime/pkg/cluster"
@@ -83,35 +84,7 @@ func (t *_trigger) Error() error {
 	return t.err
 }
 
-type Converter[I, O any] = func(I) O
-
-type RequestConverterForCluster[R comparable] = func(clusterName string) Converter[R, mcreconcile.Request]
-
-func ConvertMapFunc[O client.Object, R comparable](mapFunc handler.TypedMapFunc[O, R]) handler.TypedMapFunc[client.Object, R] {
-	return func(ctx context.Context, object client.Object) []R {
-		return mapFunc(ctx, any(object).(O))
-	}
-}
-
-func LiftRequest(clusterName string) Converter[reconcile.Request, mcreconcile.Request] {
-	return func(request reconcile.Request) mcreconcile.Request {
-		return mcreconcile.Request{
-			ClusterName: clusterName,
-			Request:     request,
-		}
-	}
-}
-
-func CompleteRequest[R mcreconcile.ClusterAware[R]](clusterName string) Converter[R, R] {
-	return func(request R) R {
-		if request.Cluster() != "" {
-			return request
-		}
-		return request.WithCluster(clusterName)
-	}
-}
-
-func mapperFactoryForTypedFactory[T client.Object, R comparable](fac TypedMapperFactory[T, R], converter RequestConverterForCluster[R]) MapperFactory {
+func mapperFactoryForTypedFactory[T client.Object, R comparable](fac TypedMapperFactory[T, R], converter helper.RequestConverterForCluster[R]) MapperFactory {
 	return func(ctx context.Context, cntr Controller) (myhandler.TypedMapFuncFactory[client.Object, mcreconcile.Request], error) {
 		m := fac(ctx, cntr)
 		return func(clusterName string, _ sigcluster.Cluster) handler.TypedMapFunc[client.Object, mcreconcile.Request] {

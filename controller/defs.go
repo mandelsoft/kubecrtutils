@@ -31,6 +31,9 @@ func NewDefinitions() Definitions {
 
 func (d *_definitions) Apply(ctx context.Context, mgr types.ControllerManager) (Controllers, error) {
 	mgr.GetLogger().Info("configure controller defined indices...")
+	if d.GetError() != nil {
+		return nil, d.GetError()
+	}
 	for _, c := range d.Elements {
 		err := c.CreateIndices(ctx, nil, mgr)
 		if err != nil {

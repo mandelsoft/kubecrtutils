@@ -206,7 +206,7 @@ func ClientSideApply(c Cluster, ctx OperationContext, manifest []byte, mod ...*M
 		return &desired, err
 	}
 
-	m, err := merge.NewObjectMerger(c.GetTypeConverter(), ctx.GetFieldManager())
+	m, err := merge.NewObjectMerger(c.GetTypeConverter(), c.GetScheme(), ctx.GetFieldManager())
 	if err != nil {
 		return nil, err
 	}
@@ -243,12 +243,12 @@ func ClientSideApply(c Cluster, ctx OperationContext, manifest []byte, mod ...*M
 
 	rawPatch := client.RawPatch(apimachtypes.MergePatchType, patchData)
 	if string(patchData) == "{}" {
-		ctx.Info("resource uptodate", "cluster", c.GetName(), "name", desired.GetName(), "namespace", desired.GetNamespace(), "groupkind", desired.GroupVersionKind())
+		ctx.Info("resource uptodate {{groupkind}} {{namespace}}/{{name}} in {{cluster}}", "cluster", c.GetName(), "name", desired.GetName(), "namespace", desired.GetNamespace(), "groupkind", desired.GroupVersionKind())
 
 		return &desired, nil // No changes, exit early
 	}
 	general.Optional(mod...).SetUpdated()
-	ctx.Info("apply patch", "cluster", c.GetName(), "name", desired.GetName(), "namespace", desired.GetNamespace(), "groupkind", desired.GroupVersionKind(), "patch", string(patchData))
+	ctx.Info("apply patch for {{groupkind}} {{namespace}}/{{name}} in {{cluster}}", "cluster", c.GetName(), "name", desired.GetName(), "namespace", desired.GetNamespace(), "groupkind", desired.GroupVersionKind(), "patch", string(patchData))
 	return &desired, c.Patch(ctx, &current, rawPatch, &client.PatchOptions{
 		FieldManager: ctx.GetFieldManager(),
 	})

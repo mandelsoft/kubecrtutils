@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/mandelsoft/goutils/general"
 	"k8s.io/client-go/rest"
@@ -121,9 +120,6 @@ func GetRestConfigFromKubeconfig(apiConfig *api.Config, overrides ...*ConfigOpti
 func TryKubeconfigFile(path string, opts *ConfigOptions) (*Config, error) {
 	config, err := clientcmd.LoadFromFile(path)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
 		return nil, fmt.Errorf("kubeconfig file %s: %w", path, err)
 	}
 	return GetRestConfigFromKubeconfig(config, opts)

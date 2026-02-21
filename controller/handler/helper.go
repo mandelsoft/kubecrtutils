@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/mandelsoft/goutils/sliceutils"
+	"github.com/mandelsoft/kubecrtutils/controller/helper"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/cluster"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -29,18 +30,14 @@ func TypedMapFuncFactoryWithClusterCompletion[object client.Object, request mcre
 }
 
 func MapFuncFactoryWithClusterInjection(fn handler.MapFunc) MapFuncFactory {
-	return TypedMapFuncFactoryWithClusterInjection[client.Object, reconcile.Request](fn)
+	return TypedMapFuncFactoryWithClusterInjection[client.Object](fn)
 
 }
-func TypedMapFuncFactoryWithClusterInjection[object client.Object, request reconcile.Request](fn handler.TypedMapFunc[object, request]) TypedMapFuncFactory[object, mcreconcile.Request] {
+func TypedMapFuncFactoryWithClusterInjection[object client.Object](fn handler.TypedMapFunc[object, reconcile.Request]) TypedMapFuncFactory[object, mcreconcile.Request] {
 	return func(clusterName string, _ cluster.Cluster) handler.TypedMapFunc[object, mcreconcile.Request] {
+		c := helper.LiftRequest(clusterName)
 		return func(ctx context.Context, obj object) []mcreconcile.Request {
-			return sliceutils.Transform(fn(ctx, obj), func(r request) mcreconcile.Request {
-				return mcreconcile.Request{
-					Request:     reconcile.Request(r),
-					ClusterName: clusterName,
-				}
-			})
+			return sliceutils.Transform(fn(ctx, obj), c)
 		}
 	}
 }

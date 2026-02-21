@@ -4,13 +4,22 @@ import (
 	"bytes"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
+
 	// "k8s.io/apimachinery/pkg/util/managedfields"
 	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 func (m *ObjectMerger) MergeObservingManagedFields(liveObj, desiredObj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	gvk, err := apiutil.GVKForObject(liveObj, m.scheme)
+	if err != nil {
+		return nil, err
+	}
 	// converter := managedfields.NewDeducedTypeConverter()
-	converter := m.converter
+	converter, err := m.converters.GetConverter(gvk)
+	if err != nil {
+		return nil, err
+	}
 
 	// 1. Convert to Typed Values
 	liveTyped, err := converter.ObjectToTyped(liveObj)

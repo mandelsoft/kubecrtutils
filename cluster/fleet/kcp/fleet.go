@@ -3,6 +3,7 @@ package kcp
 import (
 	"context"
 	"path"
+	"strings"
 	"sync"
 
 	"github.com/go-logr/logr"
@@ -11,8 +12,8 @@ import (
 	mycluster "github.com/mandelsoft/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubecrtutils/cluster/fleet"
 	"github.com/mandelsoft/kubecrtutils/cluster/fleet/fpi"
+	"github.com/mandelsoft/kubecrtutils/merge"
 	"github.com/mandelsoft/kubecrtutils/types"
-	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/cluster"
 	"sigs.k8s.io/multicluster-runtime/pkg/multicluster"
@@ -142,7 +143,7 @@ type registrations struct {
 	id fpi.Composer
 
 	lock      sync.Mutex
-	converter managedfields.TypeConverter
+	converter merge.Converters
 	clusters  map[string]types.Cluster
 	aware     multicluster.Aware
 	log       *logr.Logger
@@ -168,15 +169,7 @@ func (r *registrations) Engage(ctx context.Context, name string, cluster cluster
 		return err
 	}
 	n := *u
-	p := u.Path
-
-	for p != "" {
-		p, d := path.Split(p)
-		if d == "clusters" {
-			n.Path = path.Join(p, d, name)
-			p = ""
-		}
-	}
+	u.Path = urlPath(u.Path, name)
 
 	cl, err := mycluster.NewClusterForCRTCluster(r.Compose(name), cluster, r.converter, id, &n)
 	if err != nil {
@@ -186,13 +179,34 @@ func (r *registrations) Engage(ctx context.Context, name string, cluster cluster
 	r.clusters[name] = fpi.NewCluster(r.fleet, cl)
 	r.lock.Unlock()
 
-	r.log.Info("engage fleet cluster {{cluster}} for {{fleet}}", "cluster", name, "fleet", r.GetName())
+	r.log.Info("engage fleet cluster {{cluster}} for {{kind}} {{fleet}}", "cluster", name, "kind", r.fleet.GetTypeInfo(), "fleet", r.GetName())
 	go func() {
 		<-ctx.Done()
 		r.lock.Lock()
 		defer r.lock.Unlock()
-		r.log.Info("disengage fleet cluster {{cluster}} for fleet {{fleet}}", "cluster", name, "fleet", r.GetName())
+		r.log.Info("disengage fleet cluster {{cluster}} for {{kind}} {{fleet}}", "cluster", name, "kind", r.fleet.GetTypeInfo(), "fleet", r.GetName())
 		delete(r.clusters, name)
 	}()
 	return r.aware.Engage(ctx, name, cluster)
+}
+
+func split(p string) (string, string) {
+	p, d := path.Split(p)
+	// what a shitty API
+	for strings.HasSuffix(p, "/") {
+		p = p[:len(p)-1]
+	}
+	return p, d
+}
+
+func urlPath(provider string, name string) string {
+	p := provider
+	for p != "" {
+		r, d := split(p)
+		if d == "clusters" {
+			return path.Join(p, name)
+		}
+		p = r
+	}
+	return provider
 }

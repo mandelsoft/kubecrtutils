@@ -74,6 +74,9 @@ func (d *_definition[P, T]) GetResource() client.Object {
 }
 
 func (d *_definition[P, T]) GetIndexerFunc() client.IndexerFunc {
+	if d.idxfunc == nil {
+		return nil
+	}
 	return d.indexer
 }
 
@@ -92,16 +95,20 @@ func (d *_definition[P, T]) Apply(ctx context.Context, set Clusters, logger logg
 	if err != nil {
 		return nil, fmt.Errorf("cannot determine group/kind for %T: %w", d.proto, err)
 	}
+	if d.GetIndexerFunc() == nil {
+		return nil, fmt.Errorf("indexer required for %T: %w", d.proto)
+	}
 
+	ilog := logger.WithName("index."+d.GetName()).WithValues("index", d.GetName())
 	i := func(obj client.Object) []string {
 		r := d.idxfunc(obj.(any).(P))
 		if len(r) > 0 {
-			logger.Info("indexing {{key}}: {{values}}", "key", client.ObjectKeyFromObject(obj), "values", fmt.Sprintf("%+v", r))
+			ilog.Info("indexing {{key}}: {{values}}", "key", client.ObjectKeyFromObject(obj), "values", fmt.Sprintf("%+v", r))
 		}
 		return r
 	}
 
-	logger.Info("creating index {{index}} for {{resource}} on {{cluster}}[{{effcluster}}]", "index", d.GetName(), "resource", gk, "cluster", d.GetTarget(), "effcluster", c.GetEffective().GetName())
+	logger.Info("  creating index {{index}} for {{resource}} on {{cluster}}[{{effcluster}}]", "index", d.GetName(), "resource", gk, "cluster", d.GetTarget(), "effcluster", c.GetEffective().GetName())
 	idx, err := c.CreateIndex(ctx, d.GetName(), d.proto, i, func(_c ClusterEquivalent, name string) (Index, error) {
 		idx, err := NewDefaultIndex(d.GetName(), _c, d.proto)
 		if err != nil {

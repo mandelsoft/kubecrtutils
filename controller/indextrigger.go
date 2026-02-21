@@ -6,6 +6,7 @@ import (
 
 	"github.com/mandelsoft/goutils/sliceutils"
 	myhandler "github.com/mandelsoft/kubecrtutils/controller/handler"
+	"github.com/mandelsoft/kubecrtutils/controller/helper"
 	"github.com/mandelsoft/kubecrtutils/types"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -30,9 +31,9 @@ func indexMappingFactory[T client.Object](indexName string) MapperFactory {
 		if idx == nil {
 			return nil, fmt.Errorf("index %q not found", indexName)
 		}
-		log := c.GetLogger().WithName("indextrigger").WithName(indexName).WithValues("index", indexName, "gkv", idx.GetGVK())
+		log := c.GetLogger().WithName("indextrigger").WithName(indexName).WithValues("index", indexName, "gvk", idx.GetGVK())
 		return func(clusterName string, cl cluster.Cluster) handler.TypedMapFunc[client.Object, mcreconcile.Request] {
-			conv := LiftRequest(clusterName)
+			conv := helper.LiftRequest(clusterName)
 			return func(ctx context.Context, obj client.Object) []mcreconcile.Request {
 				key := client.ObjectKeyFromObject(obj).String()
 				list := &unstructured.UnstructuredList{}

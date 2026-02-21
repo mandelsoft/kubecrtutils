@@ -6,6 +6,8 @@ import (
 	"slices"
 	"sort"
 
+	. "github.com/mandelsoft/kubecrtutils/log"
+
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/kubecrtutils"
 	"github.com/mandelsoft/kubecrtutils/cacheindex"
@@ -66,14 +68,10 @@ func NewControllerManagerByOpts(ctx context.Context, opts flagutils.OptionSetPro
 
 	for _, n := range list {
 		c := clusters.Get(n)
-		typ := "cluster"
-		if c.AsFleet() != nil {
-			typ = "fleet"
-		}
 		if c == c.GetEffective() {
-			logger.Info("using configured {{type}} {{cluster}}[{{identity}}] accessing {{info}}", "type", typ, "cluster", n, "effective", c.GetEffective().GetName(), "identity", c.GetId(), "info", c.GetInfo())
+			Info(logger, "  using configured ", ClusterInfo(c))
 		} else {
-			logger.Info("using logical {{type}} {{cluster}} mapped to {{effective}}", "type", typ, "cluster", n, "effective", c.GetEffective().GetName())
+			Info(logger, "  using logical ", LogicalClusterInfo(c))
 		}
 	}
 

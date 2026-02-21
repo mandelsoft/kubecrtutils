@@ -186,12 +186,12 @@ func (d *_definition[P, T]) CreateIndices(ctx context.Context, mapping types.Con
 	idxmap := mapping.IndexMappings()
 	for n, i := range d.indices {
 		g := idxmap.Map(n)
-		logger.Info("creating index {{index}}[{{global}}] by controller {{controller}}", "index", n, "global", g, "controller", d.GetName())
+		logger.Info("- configuring index {{index}}[{{global}}] from controller {{controller}}", "index", n, "global", g, "controller", d.GetName())
 		idx, err := i.Apply(ctx, clusters, logger)
 		if err != nil {
 			return fmt.Errorf("index %q[%s]: %w", n, g, err)
 		}
-		logger.Info("exporting index {{index}}[{{global}}}", "index", n, "global", g)
+		logger.Info("  exporting index {{index}}[{{global}}}", "index", n, "global", g)
 		err = mgr.GetIndices().Add(cacheindex.NewIndexAlias(g, idx))
 		if err != nil {
 			return fmt.Errorf("global index %q[%s]: %w", n, g, err)
@@ -208,8 +208,12 @@ func registerIndex[I cacheindex.Index](logger logging.Logger, i cacheindex.Defin
 	if idx == nil {
 		return nil, fmt.Errorf("imported index %q[%s] not found", n, g)
 	}
-	if i.GetIndexerFunc() == nil {
-		logger.Info("importing index {{index}}[{{global}}}", "index", n, "global", g)
+
+	f := i.GetIndexerFunc()
+	if f == nil {
+		logger.Info("  importing index {{index}}[{{global}}}", "index", n, "global", g)
+	} else {
+		logger.Info("  using local index {{index}}[{{global}}}", "index", n, "global", g)
 	}
 	if reflect.TypeOf(i.GetResource()) != reflect.TypeOf(idx.GetResource()) {
 		return nil, fmt.Errorf("index %q resource type mismatch: expected %T, but found %T", n, i.GetResource(), idx.GetResource())
@@ -223,9 +227,12 @@ func registerIndex[I cacheindex.Index](logger logging.Logger, i cacheindex.Defin
 }
 
 func (d *_definition[P, T]) CreateController(ctx context.Context, mapping types.ControllerMappings, mgr types.ControllerManager) (types.Controller, error) {
+	if d.GetError() != nil {
+		return nil, d.GetError()
+	}
 	mapping = types.DefaultMappings(mapping)
 	logger := mgr.GetLogger().WithName(d.GetName()).WithValues("controller", d.GetName())
-	logger.Info("configure controller {{controller}}")
+	logger.Info("- configure controller {{controller}}")
 
 	clusters, err := cluster.Map(mgr.GetClusters(), mapping.ClusterMappings(), d.GetClusters())
 	if err != nil {
