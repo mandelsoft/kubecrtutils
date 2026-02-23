@@ -5,28 +5,46 @@ import (
 
 	"github.com/mandelsoft/goutils/general"
 	"github.com/mandelsoft/goutils/generics"
-	"github.com/mandelsoft/goutils/sliceutils"
-	myhandler "github.com/mandelsoft/kubecrtutils/controller/handler"
-	"github.com/mandelsoft/kubecrtutils/controller/helper"
-	"github.com/mandelsoft/kubecrtutils/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	sigcluster "sigs.k8s.io/controller-runtime/pkg/cluster"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	mchandler "sigs.k8s.io/multicluster-runtime/pkg/handler"
 	mcreconcile "sigs.k8s.io/multicluster-runtime/pkg/reconcile"
 )
 
-type MapperFactory = func(ctx context.Context, cntr types.Controller) (myhandler.TypedMapFuncFactory[client.Object, mcreconcile.Request], error)
+type MapFunc = TypedMapFunc[client.Object, mcreconcile.Request]
+type TypedMapFunc[T client.Object, R comparable] = handler.TypedMapFunc[T, R]
 
-type TypedMapperFactory[T client.Object, R comparable] = func(ctx context.Context, cntr Controller) handler.TypedMapFunc[T, R]
-type LocalTypedMapperFactory[T client.Object] TypedMapperFactory[T, reconcile.Request]
+type MapFuncFactory = TypedMapFuncFactory[client.Object, mcreconcile.Request]
+type TypedMapFuncFactory[object client.Object, request comparable] = ClusterAware[handler.TypedMapFunc[object, request]]
+
+type ControllerAwareMapFuncFactory = TypedControllerAwareMapFuncFactory[client.Object, mcreconcile.Request]
+type TypedControllerAwareMapFuncFactory[T client.Object, R comparable] = ControllerAware[TypedMapFuncFactory[T, R]]
+type LocalTypedControllerAwareMapFuncFactory[T client.Object] = TypedControllerAwareMapFuncFactory[T, reconcile.Request]
+
+func Lift[F any](f F) ControllerAware[ClusterAware[F]] {
+	return LiftToController(LiftToCluster(f))
+}
+
+func LiftToCluster[F any](f F) ClusterAware[F] {
+	return func(clusterName string, cluster sigcluster.Cluster) F {
+		return f
+	}
+}
+
+func LiftToController[F any](f F) ControllerAware[F] {
+	return func(ctx context.Context, c Controller) (F, error) {
+		return f, nil
+	}
+}
 
 type ResourceTriggerDefinition interface {
 	OnCluster(name string) ResourceTriggerDefinition
 
 	GetDescription() string
 	GetResource() client.Object
-	GetMapper() MapperFactory
+	GetMapper() ControllerAwareMapFuncFactory
 	GetCluster() string
 	Error() error
 }
@@ -34,26 +52,16 @@ type ResourceTriggerDefinition interface {
 type _trigger struct {
 	desc    string
 	proto   client.Object
-	mapper  MapperFactory
+	mapper  ControllerAwareMapFuncFactory
 	cluster string
 	err     error
 }
 
-func newTriggerF[T client.Object](mapper myhandler.MapFuncFactory, desc ...string) *_trigger {
-	return newTrigger[T](defaultMapperFactory(mapper), desc...)
-}
-
-func newTrigger[T client.Object](mapper MapperFactory, desc ...string) *_trigger {
+func newTrigger[T client.Object](mapper ControllerAwareMapFuncFactory, desc ...string) *_trigger {
 	return &_trigger{
 		desc:   general.OptionalDefaulted("resource mapping", desc...),
 		proto:  generics.ObjectFor[T](),
 		mapper: mapper,
-	}
-}
-
-func defaultMapperFactory(m myhandler.MapFuncFactory) MapperFactory {
-	return func(ctx context.Context, cntr types.Controller) (myhandler.MapFuncFactory, error) {
-		return m, nil
 	}
 }
 
@@ -72,7 +80,7 @@ func (t *_trigger) GetDescription() string {
 	return t.desc
 }
 
-func (t *_trigger) GetMapper() MapperFactory {
+func (t *_trigger) GetMapper() ControllerAwareMapFuncFactory {
 	return t.mapper
 }
 
@@ -84,14 +92,9 @@ func (t *_trigger) Error() error {
 	return t.err
 }
 
-func mapperFactoryForTypedFactory[T client.Object, R comparable](fac TypedMapperFactory[T, R], converter helper.RequestConverterForCluster[R]) MapperFactory {
-	return func(ctx context.Context, cntr Controller) (myhandler.TypedMapFuncFactory[client.Object, mcreconcile.Request], error) {
-		m := fac(ctx, cntr)
-		return func(clusterName string, _ sigcluster.Cluster) handler.TypedMapFunc[client.Object, mcreconcile.Request] {
-			conv := converter(clusterName)
-			return func(ctx context.Context, obj client.Object) []mcreconcile.Request {
-				return sliceutils.Transform(m(ctx, (any(obj)).(T)), conv)
-			}
-		}, nil
+// enqueueRequestFromMapFuncFactory enqueue requests for effective clusters
+func enqueueRequestFromMapFuncFactory(fn MapFuncFactory) mchandler.EventHandlerFunc {
+	return func(clusterName string, cluster sigcluster.Cluster) mchandler.EventHandler {
+		return handler.TypedEnqueueRequestsFromMapFunc[client.Object, mcreconcile.Request](fn(clusterName, cluster))
 	}
 }

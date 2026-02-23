@@ -16,7 +16,7 @@ func Map(clusters Clusters, mapping types.Mappings, names sets.Set[string]) (Clu
 		if c == nil {
 			return nil, fmt.Errorf("global cluster %q for %q not defined", global, local)
 		}
-		n.Add(NewClusterLikeAlias(local, c))
+		n.Add(NewAlias(local, c))
 	}
 	return n, nil
 }

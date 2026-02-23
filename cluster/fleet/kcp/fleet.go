@@ -9,7 +9,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/kcp-dev/multicluster-provider/apiexport"
 	"github.com/mandelsoft/goutils/maputils"
-	mycluster "github.com/mandelsoft/kubecrtutils/cluster"
+	mycluster "github.com/mandelsoft/kubecrtutils/cluster/cluster"
 	"github.com/mandelsoft/kubecrtutils/cluster/fleet"
 	"github.com/mandelsoft/kubecrtutils/cluster/fleet/fpi"
 	"github.com/mandelsoft/kubecrtutils/merge"

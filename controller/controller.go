@@ -12,7 +12,6 @@ import (
 	"github.com/mandelsoft/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubecrtutils/cluster/clustercontext"
 	abuilder "github.com/mandelsoft/kubecrtutils/controller/builder"
-	myhandler "github.com/mandelsoft/kubecrtutils/controller/handler"
 	"github.com/mandelsoft/kubecrtutils/objutils"
 	"github.com/mandelsoft/kubecrtutils/owner"
 	"github.com/mandelsoft/kubecrtutils/types"
@@ -31,6 +30,9 @@ import (
 	mcreconcile "sigs.k8s.io/multicluster-runtime/pkg/reconcile"
 )
 
+type ControllerAware[T any] func(ctx context.Context, cntr types.Controller) (T, error)
+type ClusterAware[T any] func(clusterName string, cluster2 sigcluster.Cluster) T
+
 type recorderFunc func(ctx context.Context) record.EventRecorder
 
 type _controller[P kubecrtutils.ObjectPointer[T], T any] struct {
@@ -38,6 +40,7 @@ type _controller[P kubecrtutils.ObjectPointer[T], T any] struct {
 	controllerManager    types.ControllerManager
 	definition           TypedDefinition[P, T]
 	logger               logging.Logger
+	mappings             types.Mappings // cluster mappings
 	clusters             types.Clusters
 	cluster              types.ClusterEquivalent
 	gk                   schema.GroupKind
@@ -66,6 +69,10 @@ func (c *_controller[P, T]) GetLogger() logging.Logger {
 
 func (c *_controller[P, T]) GetControllerManager() types.ControllerManager {
 	return c.controllerManager
+}
+
+func (c *_controller[P, T]) GetClusterMappings() types.Mappings {
+	return c.mappings
 }
 
 func (c *_controller[P, T]) GetClusters() types.Clusters {
@@ -160,7 +167,7 @@ func (c *_controller[P, T]) addTrigger(ctx context.Context, bldr *mcbuilder.Buil
 	}
 	bldr.Watches(
 		tdef.GetResource(),
-		watchWrapper[P, T](c, myhandler.EnqueueRequestFromMapFuncFactory(m)),
+		watchWrapper[P, T](c, enqueueRequestFromMapFuncFactory(m)),
 		mcbuilder.WithClusterFilter(target.Filter),
 	)
 	return nil
@@ -185,16 +192,18 @@ type reconcileWrapper[P kubecrtutils.ObjectPointer[T], T any] struct {
 }
 
 func (r *reconcileWrapper[P, T]) Reconcile(ctx context.Context, request mcreconcile.Request) (reconcile.Result, error) {
-	cl := r.controller.GetControllerManager().MapTechnicalName(request.ClusterName).AsCluster()
-	return r.reconciler.Reconcile(clustercontext.WithCluster(clustercontext.WithClusterName(ctx, request.ClusterName), cl), request.Request)
+	// we propagate the cluster with its logical name.as defined by the controller definition
+	n, cl := r.controller.GetCluster().LiftTechnical(request.ClusterName)
+	// handle vanished cluster engagement by propagating name separately
+	return r.reconciler.Reconcile(clustercontext.WithClusterAndName(ctx, cl, n), request.Request)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
 func watchWrapper[P kubecrtutils.ObjectPointer[T], T any](controller TypedController[P, T], factory mchandler.EventHandlerFunc) mchandler.EventHandlerFunc {
 	return func(clusterName string, cluster sigcluster.Cluster) mchandler.EventHandler {
-		cl := controller.GetControllerManager().MapTechnicalName(clusterName).AsCluster()
-		return &wrapperHandler{cl, clusterName, factory(clusterName, cluster)}
+		n, cl := controller.GetCluster().LiftTechnical(clusterName)
+		return &wrapperHandler{cl, n, factory(clusterName, cluster)}
 	}
 }
 
@@ -207,7 +216,7 @@ type wrapperHandler struct {
 var _ handler.TypedEventHandler[client.Object, mcreconcile.Request] = (*wrapperHandler)(nil)
 
 func (w *wrapperHandler) setContext(ctx context.Context) context.Context {
-	return clustercontext.WithCluster(clustercontext.WithClusterName(ctx, w.clusterName), w.cluster)
+	return clustercontext.WithClusterAndName(ctx, w.cluster, w.clusterName)
 }
 
 func (w *wrapperHandler) Create(ctx context.Context, e event.TypedCreateEvent[client.Object], wq workqueue.TypedRateLimitingInterface[mcreconcile.Request]) {

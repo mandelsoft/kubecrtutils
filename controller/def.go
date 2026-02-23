@@ -239,6 +239,7 @@ func (d *_definition[P, T]) CreateController(ctx context.Context, mapping types.
 		return nil, err
 	}
 
+	// keep logical view on technical cluster as requested by the definition
 	c := clusters.Get(d.cluster)
 	if c == nil {
 		return nil, fmt.Errorf("cluster %q not found", d.GetName())
@@ -282,7 +283,8 @@ func (d *_definition[P, T]) CreateController(ctx context.Context, mapping types.
 	controller := &_controller[P, T]{
 		controllerManager: mgr,
 		logger:            logger,
-		clusters:          clusters, // TODO; name mapping
+		mappings:          mapping.ClusterMappings(),
+		clusters:          clusters,
 		cluster:           c,
 		gk:                gk,
 		definition:        d,

@@ -3,8 +3,9 @@ package cluster
 import (
 	"fmt"
 
+	"github.com/mandelsoft/kubecrtutils/cluster/cluster"
 	"github.com/mandelsoft/kubecrtutils/cluster/config"
-	"sigs.k8s.io/controller-runtime/pkg/cluster"
+	sigcluster "sigs.k8s.io/controller-runtime/pkg/cluster"
 )
 
 type clusterDef struct {
@@ -32,7 +33,7 @@ func (d *clusterDef) Create(defs Definitions) (ClusterEquivalent, error) {
 	if cfg == nil {
 		return nil, nil
 	}
-	c, err := NewCluster(d.name, cfg, func(opts *cluster.Options) {
+	c, err := cluster.NewCluster(d.name, cfg, func(opts *sigcluster.Options) {
 		if d.scheme != nil {
 			opts.Scheme = d.scheme
 		} else {

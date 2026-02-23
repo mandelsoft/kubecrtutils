@@ -66,6 +66,14 @@ func (s *Support) FilterById(clusterId string) bool {
 	return b == s.GetId()
 }
 
+func (s *Support) LiftTechnical(clusterName string) (string, types.Cluster) {
+	b, n := Split(clusterName)
+	if b == s.name {
+		return clusterName, s.self.GetClusterByLocalName(n)
+	}
+	panic(fmt.Errorf("technical cluster %q does not match technical fleet %q", clusterName, s.name))
+}
+
 func (s *Support) createRequest(ctx context.Context, key client.ObjectKey) (mcreconcile.Request, error) {
 	c, err := s._getCluster(ctx)
 	if err != nil {

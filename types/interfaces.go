@@ -70,6 +70,7 @@ type Controller interface {
 	GetName() string
 	GetFieldManager() string
 	GetLogger() logging.Logger
+	GetClusterMappings() Mappings
 	GetClusters() Clusters
 	GetCluster() ClusterEquivalent
 	GetResource() client.Object
@@ -220,6 +221,7 @@ type ClusterEquivalent interface {
 	Filter(clusterName string, cluster cluster.Cluster) bool
 	FilterById(clusterId string) bool
 	Match(clusterName string) bool
+	LiftTechnical(clusterName string) (string, Cluster)
 }
 
 type SchemeProvider interface {

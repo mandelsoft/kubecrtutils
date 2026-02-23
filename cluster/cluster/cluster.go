@@ -170,6 +170,14 @@ func (c *_cluster) GetClusterById(clusterId string) ClusterEquivalent {
 	return nil
 }
 
+func (c *_cluster) LiftTechnical(clusterName string) (string, Cluster) {
+	if c.name == clusterName {
+		return c.name, c
+	}
+	// oops, this is already a technical cluster
+	panic(fmt.Errorf("problem in cluster nanme mappings: cluster %s cannot be seen as %q", c.name, clusterName))
+}
+
 func (c *_cluster) IsSameAs(o ClusterEquivalent) bool {
 	if o == nil {
 		return false
