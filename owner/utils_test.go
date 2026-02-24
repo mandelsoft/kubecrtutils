@@ -3,15 +3,17 @@ package owner_test
 import (
 	"context"
 	"net/http"
+	"net/url"
 
 	"github.com/mandelsoft/kubecrtutils/enqueue"
+	"github.com/mandelsoft/kubecrtutils/merge"
 	"github.com/mandelsoft/kubecrtutils/types"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/managedfields"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -24,6 +26,27 @@ type _cluster struct {
 	name   string
 	id     string
 	scheme *runtime.Scheme
+}
+
+var _ types.Cluster = (*_cluster)(nil)
+
+func (c *_cluster) LiftTechnical(clusterName string) (string, types.Cluster) {
+	return c.name, c
+}
+
+func (c *_cluster) GetEventRecorder(name string) events.EventRecorder {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (c *_cluster) GetAPIServerURL() (*url.URL, error) {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (c *_cluster) WaitForCacheSync(ctx context.Context) bool {
+	// TODO implement me
+	panic("implement me")
 }
 
 func (_ *_cluster) TriggerSource(obj runtime.Object) (enqueue.TypedEnqueue[mcreconcile.Request], error) {
@@ -208,7 +231,7 @@ func (_ *_cluster) GetIndex(name string) types.Index {
 	panic("implement me")
 }
 
-func (_ *_cluster) GetTypeConverter() managedfields.TypeConverter {
+func (_ *_cluster) GetTypeConverter() merge.Converters {
 	panic("implement me")
 }
 

@@ -9,6 +9,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/cacheindex"
 	"github.com/mandelsoft/kubecrtutils/cluster/clustercontext"
 	"github.com/mandelsoft/kubecrtutils/enqueue"
+	"github.com/mandelsoft/kubecrtutils/setup"
 	"github.com/mandelsoft/kubecrtutils/types"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -71,7 +72,8 @@ func (s *Support) LiftTechnical(clusterName string) (string, types.Cluster) {
 	if b == s.name {
 		return clusterName, s.self.GetClusterByLocalName(n)
 	}
-	panic(fmt.Errorf("technical cluster %q does not match technical fleet %q", clusterName, s.name))
+	setup.Log.Error("technical cluster {{cluster}} does not match fleet {{effective}}", "cluster", clusterName, "effective", s.name)
+	return "", nil
 }
 
 func (s *Support) createRequest(ctx context.Context, key client.ObjectKey) (mcreconcile.Request, error) {

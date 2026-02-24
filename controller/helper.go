@@ -4,16 +4,16 @@ import (
 	"context"
 
 	"github.com/mandelsoft/goutils/sliceutils"
+	"github.com/mandelsoft/kubecrtutils/controller/handler"
 	"github.com/mandelsoft/kubecrtutils/controller/helper"
 	"github.com/mandelsoft/kubecrtutils/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	sigcluster "sigs.k8s.io/controller-runtime/pkg/cluster"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	mcreconcile "sigs.k8s.io/multicluster-runtime/pkg/reconcile"
 )
 
-func mapperFactoryForTypedFactory[T client.Object, R comparable](fac TypedControllerAwareMapFuncFactory[T, R], convfactory helper.RequestConverterFactoryForCluster[R]) ControllerAwareMapFuncFactory {
-	return func(ctx context.Context, cntr types.Controller) (TypedMapFuncFactory[client.Object, mcreconcile.Request], error) {
+func mapperFactoryForTypedFactory[T client.Object, R comparable](fac handler.TypedControllerAwareMapFuncFactory[T, R], convfactory helper.RequestConverterFactoryForCluster[R]) handler.ControllerAwareMapFuncFactory {
+	return func(ctx context.Context, cntr types.Controller) (handler.TypedMapFuncFactory[client.Object, mcreconcile.Request], error) {
 		converter := convfactory(ctx, cntr)
 		f, err := fac(ctx, cntr)
 		if err != nil {

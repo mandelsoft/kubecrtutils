@@ -12,6 +12,7 @@ import (
 	"github.com/mandelsoft/logging"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	apimtypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -23,11 +24,35 @@ import (
 	mcreconcile "sigs.k8s.io/multicluster-runtime/pkg/reconcile"
 )
 
+type ObjectMapper[T any, R any] = func(ctx context.Context, obj T) []R
+type ControllerAware[T any] func(ctx context.Context, cntr Controller) (T, error)
+type ClusterAware[T any] func(clusterName string, cluster cluster.Cluster) T
+
 type ClusterMatcher func(clusterId string) (clusterName string, equal bool)
+
+// Owner describes an owner of an object.
+// including group, kine, namespace, name and cluster
+type Owner struct {
+	ClusterName string
+	client.ObjectKey
+	GroupKind schema.GroupKind
+}
+
+func (o Owner) AsKey() string {
+	return o.ClusterName + string(apimtypes.Separator) + o.ObjectKey.String() + string(apimtypes.Separator) + o.GroupKind.String()
+
+}
+
+func (o Owner) String() string {
+	return o.AsKey()
+}
 
 type OwnerHandler interface {
 	SetOwner(cluster Cluster, owner client.Object, target Cluster, slave client.Object) error
+	// GetOwner extracts the owner of a dedicated type for obj in cluster target for
+	// clusters matched by cmatch.
 	GetOwner(cmatch ClusterMatcher, target Cluster, obj client.Object, kind schema.GroupKind) (string, *client.ObjectKey)
+	GetOwners(cmatch ClusterMatcher, target Cluster, obj client.Object) []Owner
 }
 
 type ControllerManager interface {

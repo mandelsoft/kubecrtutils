@@ -24,9 +24,10 @@ func MapOwnerToRequestForGK[T client.Object](hdlr Handler, matcher ClusterMatche
 			return nil
 		}
 		if len(log) > 0 {
-			log[0].Info("found owner {{owner}} of modified object {{modified}}",
+			log[0].Info("found owner {{owner}} of modified object {{modified}} in cluster {{cluster}}",
 				"owner", *okey,
-				"modified", client.ObjectKeyFromObject(obj))
+				"modified", client.ObjectKeyFromObject(obj),
+				"cluster", cl.GetName())
 		}
 		return []mcreconcile.Request{
 			{ClusterName: cname,
@@ -56,5 +57,24 @@ func MapLocalOwnerToRequestForGK(hdlr Handler, matcher ClusterMatcher, src types
 		return []reconcile.Request{
 			{NamespacedName: *okey},
 		}
+	}
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+func MapOwners[T client.Object](hdlr Handler, matcher ClusterMatcher, src types.Cluster, log ...logging.Logger) types.ObjectMapper[T, Owner] {
+	return func(ctx context.Context, obj T) []Owner {
+		cl := src
+		if cl == nil {
+			cl = clustercontext.ClusterFor(ctx)
+		}
+		owners := hdlr.GetOwners(matcher, cl, obj)
+
+		if len(owners) > 0 {
+			log[0].Info("found owners {{owner}} of modified object {{modified}}",
+				"owners", owners,
+				"modified", client.ObjectKeyFromObject(obj))
+		}
+		return owners
 	}
 }

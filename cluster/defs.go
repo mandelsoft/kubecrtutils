@@ -60,7 +60,7 @@ func (d *definitions) Validate(ctx context.Context, opts flagutils.OptionSet, v 
 	if d.clusters == nil && d.GetError() == nil {
 		err := v.ValidateSet(ctx, opts, &d.DefinitionsImpl)
 		if err != nil {
-			return err
+			return d.AddError(err, "validation")
 		}
 		d.clusters = NewClusters()
 
@@ -73,7 +73,7 @@ func (d *definitions) Validate(ctx context.Context, opts flagutils.OptionSet, v 
 				if d.clusters.Get(n) == nil {
 					acc, err := def.Create(d)
 					if err != nil {
-						return err
+						return d.AddError(err, "cluster ", n)
 					}
 					if acc != nil {
 						found = true
@@ -97,12 +97,12 @@ func (d *definitions) Validate(ctx context.Context, opts flagutils.OptionSet, v 
 						if fb == DEFAULT {
 							err := v.Validate(ctx, opts, d.main)
 							if err != nil {
-								return err
+								return d.AddError(err, "cluster ", d.main)
 							}
 
 							acc, err := d.main.Create(d)
 							if err != nil {
-								return err
+								return d.AddError(err, "cluster ", d.main)
 							}
 							if acc != nil {
 								d.clusters.Add(acc)
@@ -118,7 +118,7 @@ func (d *definitions) Validate(ctx context.Context, opts flagutils.OptionSet, v 
 		if missing {
 			for n, _ := range d.Elements {
 				if d.clusters.Get(n) == nil {
-					return fmt.Errorf("kubeconfig for cluster %q required", n)
+					return d.AddError(fmt.Errorf("kubeconfig required"), "cluster ", n)
 				}
 			}
 		}

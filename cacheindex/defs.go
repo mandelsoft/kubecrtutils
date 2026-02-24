@@ -30,6 +30,9 @@ func NewDefinitions() Definitions {
 }
 
 func (d *_definitions) GetIndices(ctx context.Context, clusters Clusters, logger logging.Logger) (Indices, error) {
+	if d.GetError() != nil {
+		return nil, d.GetError()
+	}
 	indices := NewIndices()
 	for n, i := range d.Elements {
 		_, err := i.Apply(ctx, clusters, logger)

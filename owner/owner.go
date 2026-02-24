@@ -15,6 +15,7 @@ import (
 
 type ClusterMatcher = types.ClusterMatcher
 type Handler = types.OwnerHandler
+type Owner = types.Owner
 
 type standard struct {
 	annoType AnnotationType
@@ -83,4 +84,39 @@ func (h *standard) GetOwner(cmatch ClusterMatcher, target types.Cluster, obj cli
 		return "", nil
 	}
 	return cname, generics.PointerTo(a.ObjectKey())
+}
+
+func (h *standard) GetOwners(cmatch ClusterMatcher, target types.Cluster, obj client.Object) []Owner {
+	var result []Owner
+	n := funcs.First(cmatch(target.GetId()))
+	if n != "" {
+		for _, r := range obj.GetOwnerReferences() {
+			gv, _ := schema.ParseGroupVersion(r.APIVersion)
+			g := gv.Group
+			if g == "" {
+				g = "core"
+			}
+			result = append(result, Owner{
+				n,
+				client.ObjectKey{Name: r.Name, Namespace: obj.GetNamespace()},
+				schema.GroupKind{Group: g, Kind: r.Kind},
+			})
+		}
+	}
+
+	// [cluster /] group / kind / namespace / name
+	a, err := h.annoType.Get(obj.GetAnnotations())
+	if a == nil || err != nil {
+		return result
+	}
+
+	n = funcs.First(cmatch(a.ClusterId(target.GetId())))
+	if n != "" {
+		result = append(result, Owner{
+			n,
+			a.ObjectKey(),
+			a.GroupKind(),
+		})
+	}
+	return result
 }

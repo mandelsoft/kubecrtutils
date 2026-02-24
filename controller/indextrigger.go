@@ -7,18 +7,19 @@ import (
 	"github.com/mandelsoft/goutils/general"
 	"github.com/mandelsoft/goutils/sliceutils"
 	"github.com/mandelsoft/goutils/transformer"
+	"github.com/mandelsoft/kubecrtutils/controller/handler"
 	"github.com/mandelsoft/kubecrtutils/controller/helper"
+	"github.com/mandelsoft/kubecrtutils/owner"
 	"github.com/mandelsoft/kubecrtutils/types"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	apimtypes "k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	sigcluster "sigs.k8s.io/controller-runtime/pkg/cluster"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	mcreconcile "sigs.k8s.io/multicluster-runtime/pkg/reconcile"
 )
 
-type RequestToIndexKey[R comparable] = transformer.Transformer[R, string]
+type IndexKeyTransformer[R comparable] = transformer.Transformer[R, string]
 
 func DefaultRequestToIndexKey(req mcreconcile.Request) string {
 	if req.ClusterName == "" {
@@ -34,8 +35,6 @@ func DefaultRequestToLocalIndexKey(req mcreconcile.Request) string {
 func DefaultLocalRequestToIndexKey(req reconcile.Request) string {
 	return req.String()
 }
-
-type ObjectMapper[T client.Object, R any] = func(ctx context.Context, obj T) []R
 
 type ObjectToIndexKeyMapper[T client.Object] = ObjectMapper[T, string]
 type ObjectToIndexKeyMapperFactory[T client.Object] = ControllerAware[ClusterAware[ObjectToIndexKeyMapper[T]]]
@@ -63,59 +62,46 @@ type ObjectToIndexKeyMapperFactory[T client.Object] = ControllerAware[ClusterAwa
 //		            W
 //
 // An object C references some object O (of potentially any type).
-// AN index maintains maps the identity of O (including type) to the referencing
+// An index maintains maps the identity of O (including type) to the referencing
 // objects C. The controller of O maintains an object of type W, which
 // is watched. All owners are tried to map to C objects using the index.
 // For those objects the reconcilation is triggered.
-func OwnerIndexTrigger[T, O client.Object](name string, converter ...RequestToIndexKey[mcreconcile.Request]) ResourceTriggerDefinition {
-	c := general.OptionalDefaulted[RequestToIndexKey[mcreconcile.Request]](DefaultRequestToIndexKey, converter...)
-	o := OwnerMapFuncFactory[T, O](false)
+func OwnerIndexTrigger[T client.Object](name string, converter ...IndexKeyTransformer[owner.Owner]) ResourceTriggerDefinition {
+	c := general.OptionalDefaulted[IndexKeyTransformer[owner.Owner]](owner.Owner.AsKey, converter...)
+	o := mapOwnersFactory[T](false)
 	m := GenericIndexKeyMapperByFactory(o, c)
-	return IndexTrigger[T](name, m)
-}
-
-// LocalOwnerIndexTrigger maps a resource of type T to its owner of type O, which is then used
-// as key for an index to trigger a reconcilation.
-// Only owners local to the object`s cluster are considered.
-// The index key is composed by default with DefaultRequestToLocalIndexKey
-// omitting the cluster name.
-func LocalOwnerIndexTrigger[T, O client.Object](name string, converter ...RequestToIndexKey[mcreconcile.Request]) ResourceTriggerDefinition {
-	c := general.OptionalDefaulted[RequestToIndexKey[mcreconcile.Request]](DefaultRequestToLocalIndexKey, converter...)
-	o := OwnerMapFuncFactory[T, O](true)
-	m := GenericIndexKeyMapperByFactory(o, c)
-
 	return IndexTrigger[T](name, m)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
-func IndexKeyMapper[T client.Object](mapFunc TypedMapFunc[T, mcreconcile.Request], converter ...RequestToIndexKey[mcreconcile.Request]) ObjectToIndexKeyMapperFactory[T] {
-	c := general.OptionalDefaulted[RequestToIndexKey[mcreconcile.Request]](DefaultRequestToIndexKey, converter...)
+func IndexKeyMapper[T client.Object](mapFunc handler.TypedMapFunc[T, mcreconcile.Request], converter ...IndexKeyTransformer[mcreconcile.Request]) ObjectToIndexKeyMapperFactory[T] {
+	c := general.OptionalDefaulted[IndexKeyTransformer[mcreconcile.Request]](DefaultRequestToIndexKey, converter...)
 	return GenericIndexKeyMapperForMapFunc(mapFunc, c)
 }
 
-func LocalIndexKeyMapper[T client.Object](mapFunc TypedMapFunc[T, reconcile.Request], converter ...RequestToIndexKey[reconcile.Request]) ObjectToIndexKeyMapperFactory[T] {
-	c := general.OptionalDefaulted[RequestToIndexKey[reconcile.Request]](DefaultLocalRequestToIndexKey, converter...)
+func LocalIndexKeyMapper[T client.Object](mapFunc handler.TypedMapFunc[T, reconcile.Request], converter ...IndexKeyTransformer[reconcile.Request]) ObjectToIndexKeyMapperFactory[T] {
+	c := general.OptionalDefaulted[IndexKeyTransformer[reconcile.Request]](DefaultLocalRequestToIndexKey, converter...)
 	return GenericIndexKeyMapperForMapFunc(mapFunc, c)
 }
 
 func GenericIndexKeyMapperForMapFunc[T client.Object, R comparable](mapFunc handler.TypedMapFunc[T, R], converter transformer.Transformer[R, string]) ObjectToIndexKeyMapperFactory[T] {
-	return Lift(func(ctx context.Context, obj T) []string {
+	return handler.Lift(func(ctx context.Context, obj T) []string {
 		return sliceutils.Transform[[]R, R, string](mapFunc(ctx, obj), converter)
 	})
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-func IndexKeyMapperByFactory[T client.Object](mapFunc TypedControllerAwareMapFuncFactory[T, mcreconcile.Request]) ObjectToIndexKeyMapperFactory[T] {
+func IndexKeyMapperByFactory[T client.Object](mapFunc handler.TypedControllerAwareMapFuncFactory[T, mcreconcile.Request]) ObjectToIndexKeyMapperFactory[T] {
 	return GenericIndexKeyMapperByFactory(mapFunc, DefaultRequestToIndexKey)
 }
 
-func LocalIndexKeyMapperByFactory[T client.Object](mapFunc TypedControllerAwareMapFuncFactory[T, reconcile.Request]) ObjectToIndexKeyMapperFactory[T] {
+func LocalIndexKeyMapperByFactory[T client.Object](mapFunc handler.TypedControllerAwareMapFuncFactory[T, reconcile.Request]) ObjectToIndexKeyMapperFactory[T] {
 	return GenericIndexKeyMapperByFactory(mapFunc, DefaultLocalRequestToIndexKey)
 }
 
-func GenericIndexKeyMapperByFactory[T client.Object, R comparable](mapFunc TypedControllerAwareMapFuncFactory[T, R], converter transformer.Transformer[R, string]) ObjectToIndexKeyMapperFactory[T] {
+func GenericIndexKeyMapperByFactory[T client.Object, R comparable](mapFunc ControllerAware[ClusterAware[ObjectMapper[T, R]]], converter transformer.Transformer[R, string]) ObjectToIndexKeyMapperFactory[T] {
 	return func(ctx context.Context, cntr types.Controller) (ClusterAware[ObjectToIndexKeyMapper[T]], error) {
 		f, err := mapFunc(ctx, cntr)
 		if err != nil {
@@ -147,18 +133,6 @@ func transformMapper[T client.Object, R, O comparable, IF ControllerAware[Cluste
 
 ////////////////////////////////////////////////////////////////////////////////
 
-type objectToIndexKeyMapper[T client.Object, R comparable] struct {
-	mapFunc      handler.TypedMapFunc[T, R]
-	keyconverter transformer.Transformer[R, string]
-}
-
-func (m *objectToIndexKeyMapper[T, R]) MapObjectToIndexKeys(ctx context.Context, obj T) []string {
-	reqs := m.mapFunc(ctx, obj)
-	return sliceutils.Transform(reqs, m.keyconverter)
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
 // IndexTrigger uses an index mapping a T object identity to the controller resource
 // to trigger all objects on a changing T.
 func IndexTrigger[T client.Object](indexName string, mapFunc ...ObjectToIndexKeyMapperFactory[T]) ResourceTriggerDefinition {
@@ -168,8 +142,8 @@ func IndexTrigger[T client.Object](indexName string, mapFunc ...ObjectToIndexKey
 	)
 }
 
-func indexMappingFactory[T client.Object](indexName string, mapFunc ...ObjectToIndexKeyMapperFactory[T]) ControllerAwareMapFuncFactory {
-	return func(ctx context.Context, c types.Controller) (MapFuncFactory, error) {
+func indexMappingFactory[T client.Object](indexName string, mapFunc ...ObjectToIndexKeyMapperFactory[T]) handler.ControllerAwareMapFuncFactory {
+	return func(ctx context.Context, c types.Controller) (handler.MapFuncFactory, error) {
 		idx := c.GetIndex(indexName)
 		if idx == nil {
 			return nil, fmt.Errorf("index %q not found", indexName)
@@ -183,7 +157,7 @@ func indexMappingFactory[T client.Object](indexName string, mapFunc ...ObjectToI
 			}
 		}
 		log := c.GetLogger().WithName("indextrigger").WithName(indexName).WithValues("index", indexName, "gvk", idx.GetGVK())
-		return func(clusterName string, cl sigcluster.Cluster) handler.TypedMapFunc[client.Object, mcreconcile.Request] {
+		return func(clusterName string, cl sigcluster.Cluster) handler.MapFunc {
 			var mapper ObjectToIndexKeyMapper[T]
 			if f != nil {
 				mapper = f(clusterName, cl)

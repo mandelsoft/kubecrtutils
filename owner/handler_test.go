@@ -105,6 +105,10 @@ var _ = Describe("Owner Test Environment", func() {
 
 			Expect(Ref(handler.GetOwner(match1, cluster1, _slaveDefault, gvkSlave.GroupKind()))).To(BeNil())
 			Expect(Ref(handler.GetOwner(match2, cluster1, _slaveDefault, gvkOwner.GroupKind()))).To(BeNil())
+
+			Expect(handler.GetOwners(match1, cluster1, _slaveDefault)).To(Equal(
+				[]owner.Owner{{"A", sigclient.ObjectKey{Namespace: "default", Name: "owner"}, schema.GroupKind{Group: "core", Kind: "Service"}}},
+			))
 		})
 
 		It("cross namespace", func() {
@@ -115,6 +119,10 @@ var _ = Describe("Owner Test Environment", func() {
 
 			Expect(Ref(handler.GetOwner(match1, cluster1, _slaveOther, gvkSlave.GroupKind()))).To(BeNil())
 			Expect(Ref(handler.GetOwner(match2, cluster1, _slaveOther, gvkOwner.GroupKind()))).To(BeNil())
+
+			Expect(handler.GetOwners(match1, cluster1, _slaveOther)).To(Equal(
+				[]owner.Owner{{"A", sigclient.ObjectKey{Namespace: "default", Name: "owner"}, schema.GroupKind{Group: "core", Kind: "Service"}}},
+			))
 		})
 	})
 
@@ -126,6 +134,10 @@ var _ = Describe("Owner Test Environment", func() {
 
 			Expect(Ref(handler.GetOwner(match1, cluster2, _slaveDefault, gvkOwner.GroupKind()))).To(Equal(RefO(cluster1, _owner)))
 			Expect(Ref(handler.GetOwner(match1, cluster2, _slaveDefault, gvkSlave.GroupKind()))).To(BeNil())
+
+			Expect(handler.GetOwners(match1, cluster1, _slaveDefault)).To(Equal(
+				[]owner.Owner{{"A", sigclient.ObjectKey{Namespace: "default", Name: "owner"}, schema.GroupKind{Group: "core", Kind: "Service"}}},
+			))
 		})
 
 		It("cross namespace", func() {
@@ -134,6 +146,10 @@ var _ = Describe("Owner Test Environment", func() {
 
 			Expect(Ref(handler.GetOwner(match1, cluster2, _slaveOther, gvkOwner.GroupKind()))).To(Equal(RefO(cluster1, _owner)))
 			Expect(Ref(handler.GetOwner(match1, cluster2, _slaveOther, gvkSlave.GroupKind()))).To(BeNil())
+
+			Expect(handler.GetOwners(match1, cluster1, _slaveOther)).To(Equal(
+				[]owner.Owner{{"A", sigclient.ObjectKey{Namespace: "default", Name: "owner"}, schema.GroupKind{Group: "core", Kind: "Service"}}},
+			))
 		})
 	})
 })

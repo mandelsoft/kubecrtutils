@@ -118,3 +118,5 @@ require (
 )
 
 replace github.com/mandelsoft/kubedns => ../kubedns
+
+//replace sigs.k8s.io/multicluster-runtime => ../../../sigs.k8s.io/multicluster-runtime

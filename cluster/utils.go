@@ -3,6 +3,7 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/mandelsoft/goutils/general"
 	"github.com/mandelsoft/goutils/generics"
@@ -204,6 +205,16 @@ func ClientSideApply(c Cluster, ctx OperationContext, manifest []byte, mod ...*M
 		return &desired, err
 	}
 
+	for n, v := range current.GetAnnotations() {
+		if strings.HasSuffix(v, ".kcp.io") {
+			current.GetAnnotations()[n] = v
+		}
+	}
+	for n, v := range current.GetLabels() {
+		if strings.HasSuffix(v, ".kcp.io") {
+			current.GetLabels()[n] = v
+		}
+	}
 	m, err := merge.NewObjectMerger(c.GetTypeConverter(), c.GetScheme(), ctx.GetFieldManager())
 	if err != nil {
 		return nil, err

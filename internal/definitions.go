@@ -1,8 +1,6 @@
 package internal
 
 import (
-	"fmt"
-
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/goutils/errors"
 	"github.com/spf13/pflag"
@@ -29,9 +27,8 @@ var _ Definitions[Named, any] = (*DefinitionsImpl[Named, any])(nil)
 
 func NewDefinitions[T Named, D any](typ string, self D) DefinitionsImpl[T, D] {
 	return DefinitionsImpl[T, D]{
-		_group:  newGroup[T](typ),
-		self:    self,
-		errlist: errors.ErrListf("%s definitions", typ),
+		_group: newGroup[T](typ),
+		self:   self,
 	}
 }
 
@@ -43,19 +40,11 @@ func (d *DefinitionsImpl[T, D]) Add(elems ...T) D {
 	defer d.Lock()()
 
 	for _, e := range elems {
-		if _, ok := d.elements[e.GetName()]; ok {
-			d.errlist.Add(fmt.Errorf("duplicate %s %s definition", d.typename, e.GetName()))
-		} else {
+		if err := d.add(e); err == nil {
 			flagutils.AddOptionally(&d.options, e)
-			d.elements[e.GetName()] = e
 		}
 	}
 	return d.self
-}
-
-func (d *DefinitionsImpl[T, D]) GetError() error {
-	defer d.Lock()()
-	return d.errlist.Result()
 }
 
 ////////////////////////////////////////////////////////////////////////////////

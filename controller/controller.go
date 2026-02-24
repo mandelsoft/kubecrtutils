@@ -30,9 +30,6 @@ import (
 	mcreconcile "sigs.k8s.io/multicluster-runtime/pkg/reconcile"
 )
 
-type ControllerAware[T any] func(ctx context.Context, cntr types.Controller) (T, error)
-type ClusterAware[T any] func(clusterName string, cluster2 sigcluster.Cluster) T
-
 type recorderFunc func(ctx context.Context) record.EventRecorder
 
 type _controller[P kubecrtutils.ObjectPointer[T], T any] struct {
@@ -141,7 +138,7 @@ func (c *_controller[P, T]) Complete(ctx context.Context) error {
 		}
 	}
 
-	err = bldr.Complete(&reconcileWrapper[P, T]{c, r})
+	err = bldr.Complete(&reconcileWrapper[P, T]{cl, r})
 	if err != nil {
 		return err
 	}
@@ -167,7 +164,7 @@ func (c *_controller[P, T]) addTrigger(ctx context.Context, bldr *mcbuilder.Buil
 	}
 	bldr.Watches(
 		tdef.GetResource(),
-		watchWrapper[P, T](c, enqueueRequestFromMapFuncFactory(m)),
+		watchWrapper[P, T](target, enqueueRequestFromMapFuncFactory(m), tdef),
 		mcbuilder.WithClusterFilter(target.Filter),
 	)
 	return nil
@@ -187,22 +184,25 @@ func (c *_controller[P, T]) GenerateNameFor(ctx context.Context, tgt types.Clust
 ////////////////////////////////////////////////////////////////////////////////
 
 type reconcileWrapper[P kubecrtutils.ObjectPointer[T], T any] struct {
-	controller TypedController[P, T]
+	cluster    types.ClusterEquivalent
 	reconciler reconcile.Reconciler
 }
 
 func (r *reconcileWrapper[P, T]) Reconcile(ctx context.Context, request mcreconcile.Request) (reconcile.Result, error) {
 	// we propagate the cluster with its logical name.as defined by the controller definition
-	n, cl := r.controller.GetCluster().LiftTechnical(request.ClusterName)
+	n, cl := r.cluster.LiftTechnical(request.ClusterName)
 	// handle vanished cluster engagement by propagating name separately
 	return r.reconciler.Reconcile(clustercontext.WithClusterAndName(ctx, cl, n), request.Request)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
-func watchWrapper[P kubecrtutils.ObjectPointer[T], T any](controller TypedController[P, T], factory mchandler.EventHandlerFunc) mchandler.EventHandlerFunc {
+func watchWrapper[P kubecrtutils.ObjectPointer[T], T any](target types.ClusterEquivalent, factory mchandler.EventHandlerFunc, def ResourceTriggerDefinition) mchandler.EventHandlerFunc {
 	return func(clusterName string, cluster sigcluster.Cluster) mchandler.EventHandler {
-		n, cl := controller.GetCluster().LiftTechnical(clusterName)
+		n, cl := target.LiftTechnical(clusterName)
+		if cl == nil {
+			// return handler to avoid crashed for omitted clusters
+		}
 		return &wrapperHandler{cl, n, factory(clusterName, cluster)}
 	}
 }

@@ -2,7 +2,6 @@ package controller
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"maps"
 	"reflect"
@@ -55,6 +54,7 @@ type TypedDefinition[P kubecrtutils.ObjectPointer[T], T any] interface {
 
 type _definition[P kubecrtutils.ObjectPointer[T], T any] struct {
 	internal.Element
+	internal.ErrorContainer
 	predicates []predicate.Predicate
 	cluster    string
 	clusters   sets.Set[string]
@@ -63,7 +63,6 @@ type _definition[P kubecrtutils.ObjectPointer[T], T any] struct {
 	indices    map[string]cacheindex.TypedDefinition[P, T]
 	imports    map[string]cacheindex.Definition
 	triggers   []ResourceTriggerDefinition
-	err        error
 }
 
 func DefineByFunc[P kubecrtutils.ObjectPointer[T], T any](name string, cluster string, fac ReconcilerFactoryFunc[P, T]) TypedDefinition[P, T] {
@@ -72,13 +71,14 @@ func DefineByFunc[P kubecrtutils.ObjectPointer[T], T any](name string, cluster s
 
 func Define[P kubecrtutils.ObjectPointer[T], T any](name string, cluster string, fac ReconcilerFactory[P, T]) TypedDefinition[P, T] {
 	d := &_definition[P, T]{
-		Element:    internal.NewElement(name),
-		cluster:    cluster,
-		clusters:   sets.New[string](cluster),
-		proto:      generics.ObjectFor[P](),
-		reconciler: fac,
-		indices:    map[string]cacheindex.TypedDefinition[P, T]{},
-		imports:    map[string]cacheindex.Definition{},
+		Element:        internal.NewElement(name),
+		ErrorContainer: *internal.NewErrorContainer(fmt.Sprintf("controller %s", name)),
+		cluster:        cluster,
+		clusters:       sets.New[string](cluster),
+		proto:          generics.ObjectFor[P](),
+		reconciler:     fac,
+		indices:        map[string]cacheindex.TypedDefinition[P, T]{},
+		imports:        map[string]cacheindex.Definition{},
 	}
 	return d
 }
@@ -95,17 +95,20 @@ func (d *_definition[P, T]) UseCluster(name ...string) TypedDefinition[P, T] {
 
 func (d *_definition[P, T]) AddIndex(name string, indexerFunc cacheindex.IndexerFunc[P]) TypedDefinition[P, T] {
 	if d.indices[name] != nil || d.imports[name] != nil {
-		d.err = errors.Join(d.err, fmt.Errorf("duplicate deinition of index %q", name))
+		d.AddError(fmt.Errorf("duplicate definition of index %q", name))
 	} else {
-		d.indices[name] = cacheindex.Define[P, T](name, d.cluster, indexerFunc)
+		i := cacheindex.Define[P, T](name, d.cluster, indexerFunc)
+		d.indices[name] = i
+		d.AddError(i, "index ", name)
 	}
 	return d
 }
 
 func (d *_definition[P, T]) ImportIndex(def cacheindex.Reference) TypedDefinition[P, T] {
 	if d.indices[def.GetName()] != nil || d.imports[def.GetName()] != nil {
-		d.err = errors.Join(d.err, fmt.Errorf("duplicate deinition of index %q", def.GetName()))
+		d.AddError(fmt.Errorf("duplicate dedinition of index %q"))
 	} else {
+		d.AddError(def, "index ", def.GetName())
 		d.imports[def.GetName()] = def
 	}
 	return d
@@ -146,10 +149,6 @@ func (d *_definition[P, T]) Finalize(ctx context.Context, opts flagutils.OptionS
 		return o.Finalize(ctx, opts, v)
 	}
 	return v.FinalizeSet(ctx, opts, d.AsOptionSet())
-}
-
-func (d *_definition[P, T]) GetError() error {
-	return d.err
 }
 
 func (d *_definition[P, T]) GetCluster() string {

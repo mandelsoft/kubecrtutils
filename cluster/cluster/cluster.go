@@ -12,6 +12,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/cluster/config"
 	"github.com/mandelsoft/kubecrtutils/enqueue"
 	"github.com/mandelsoft/kubecrtutils/merge"
+	"github.com/mandelsoft/kubecrtutils/setup"
 	"github.com/mandelsoft/kubecrtutils/types"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -171,11 +172,13 @@ func (c *_cluster) GetClusterById(clusterId string) ClusterEquivalent {
 }
 
 func (c *_cluster) LiftTechnical(clusterName string) (string, Cluster) {
-	if c.name == clusterName {
+	if c.name == Normalize(clusterName) {
 		return c.name, c
 	}
-	// oops, this is already a technical cluster
-	panic(fmt.Errorf("problem in cluster nanme mappings: cluster %s cannot be seen as %q", c.name, clusterName))
+	setup.Log.Error("problem in cluster name mappings: cluster {{cluster}} cannot be seen as {{effective}}", "effective", c.name, "cluster", clusterName)
+	// is called by MCRT for omitted clusters, also
+	// panic(fmt.Errorf("problem in cluster nanme mappings: cluster %s cannot be seen as %q", c.name, clusterName))
+	return "", nil
 }
 
 func (c *_cluster) IsSameAs(o ClusterEquivalent) bool {
