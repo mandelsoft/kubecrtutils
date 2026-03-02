@@ -17,6 +17,8 @@ type ClusterMatcher = types.ClusterMatcher
 type Handler = types.OwnerHandler
 type Owner = types.Owner
 
+var NewOwner = types.NewOwner
+
 type standard struct {
 	annoType AnnotationType
 	scheme   *runtime.Scheme
@@ -86,21 +88,23 @@ func (h *standard) GetOwner(cmatch ClusterMatcher, target types.Cluster, obj cli
 	return cname, generics.PointerTo(a.ObjectKey())
 }
 
-func (h *standard) GetOwners(cmatch ClusterMatcher, target types.Cluster, obj client.Object) []Owner {
+func (h *standard) GetOwners(cmatch ClusterMatcher, targetId string, obj client.Object) []Owner {
 	var result []Owner
-	n := funcs.First(cmatch(target.GetId()))
-	if n != "" {
+	n, eq := cmatch(targetId)
+	// index functions do not have access to the actual cluster, therefore we use the empty name here to
+	// denote the actual (target) cluster
+	if n != "" || (n == "" && eq) {
 		for _, r := range obj.GetOwnerReferences() {
 			gv, _ := schema.ParseGroupVersion(r.APIVersion)
 			g := gv.Group
 			if g == "" {
 				g = "core"
 			}
-			result = append(result, Owner{
+			result = append(result, NewOwner(
 				n,
 				client.ObjectKey{Name: r.Name, Namespace: obj.GetNamespace()},
 				schema.GroupKind{Group: g, Kind: r.Kind},
-			})
+			))
 		}
 	}
 
@@ -110,13 +114,13 @@ func (h *standard) GetOwners(cmatch ClusterMatcher, target types.Cluster, obj cl
 		return result
 	}
 
-	n = funcs.First(cmatch(a.ClusterId(target.GetId())))
-	if n != "" {
-		result = append(result, Owner{
+	n, eq = cmatch(a.ClusterId(targetId))
+	if n != "" || (eq && n == "") {
+		result = append(result, NewOwner(
 			n,
 			a.ObjectKey(),
 			a.GroupKind(),
-		})
+		))
 	}
 	return result
 }

@@ -3,6 +3,7 @@ package owner_test
 import (
 	"github.com/mandelsoft/goutils/generics"
 	. "github.com/mandelsoft/goutils/testutils"
+	"github.com/mandelsoft/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubecrtutils/owner"
 	"github.com/mandelsoft/kubecrtutils/types"
 	. "github.com/onsi/ginkgo/v2"
@@ -106,7 +107,7 @@ var _ = Describe("Owner Test Environment", func() {
 			Expect(Ref(handler.GetOwner(match1, cluster1, _slaveDefault, gvkSlave.GroupKind()))).To(BeNil())
 			Expect(Ref(handler.GetOwner(match2, cluster1, _slaveDefault, gvkOwner.GroupKind()))).To(BeNil())
 
-			Expect(handler.GetOwners(match1, cluster1, _slaveDefault)).To(Equal(
+			Expect(handler.GetOwners(match1, cluster1.GetId(), _slaveDefault)).To(Equal(
 				[]owner.Owner{{"A", sigclient.ObjectKey{Namespace: "default", Name: "owner"}, schema.GroupKind{Group: "core", Kind: "Service"}}},
 			))
 		})
@@ -120,7 +121,7 @@ var _ = Describe("Owner Test Environment", func() {
 			Expect(Ref(handler.GetOwner(match1, cluster1, _slaveOther, gvkSlave.GroupKind()))).To(BeNil())
 			Expect(Ref(handler.GetOwner(match2, cluster1, _slaveOther, gvkOwner.GroupKind()))).To(BeNil())
 
-			Expect(handler.GetOwners(match1, cluster1, _slaveOther)).To(Equal(
+			Expect(handler.GetOwners(match1, cluster1.GetId(), _slaveOther)).To(Equal(
 				[]owner.Owner{{"A", sigclient.ObjectKey{Namespace: "default", Name: "owner"}, schema.GroupKind{Group: "core", Kind: "Service"}}},
 			))
 		})
@@ -135,7 +136,7 @@ var _ = Describe("Owner Test Environment", func() {
 			Expect(Ref(handler.GetOwner(match1, cluster2, _slaveDefault, gvkOwner.GroupKind()))).To(Equal(RefO(cluster1, _owner)))
 			Expect(Ref(handler.GetOwner(match1, cluster2, _slaveDefault, gvkSlave.GroupKind()))).To(BeNil())
 
-			Expect(handler.GetOwners(match1, cluster1, _slaveDefault)).To(Equal(
+			Expect(handler.GetOwners(match1, cluster1.GetId(), _slaveDefault)).To(Equal(
 				[]owner.Owner{{"A", sigclient.ObjectKey{Namespace: "default", Name: "owner"}, schema.GroupKind{Group: "core", Kind: "Service"}}},
 			))
 		})
@@ -147,9 +148,166 @@ var _ = Describe("Owner Test Environment", func() {
 			Expect(Ref(handler.GetOwner(match1, cluster2, _slaveOther, gvkOwner.GroupKind()))).To(Equal(RefO(cluster1, _owner)))
 			Expect(Ref(handler.GetOwner(match1, cluster2, _slaveOther, gvkSlave.GroupKind()))).To(BeNil())
 
-			Expect(handler.GetOwners(match1, cluster1, _slaveOther)).To(Equal(
+			Expect(handler.GetOwners(match1, cluster1.GetId(), _slaveOther)).To(Equal(
 				[]owner.Owner{{"A", sigclient.ObjectKey{Namespace: "default", Name: "owner"}, schema.GroupKind{Group: "core", Kind: "Service"}}},
 			))
+		})
+	})
+
+	Context("local matcher", func() {
+		Context("local", func() {
+			It("same namespace", func() {
+				MustBeSuccessful(handler.SetOwner(cluster1, _owner, cluster1, _slaveDefault))
+
+				Expect(handler.GetOwners(owner.LocalMatcher("", ""), "", _slaveDefault)).To(Equal(
+					[]owner.Owner{{"", sigclient.ObjectKey{Namespace: "default", Name: "owner"}, schema.GroupKind{Group: "core", Kind: "Service"}}},
+				))
+
+				Expect(handler.GetOwners(owner.LocalMatcher("A", IdA), "", _slaveDefault)).To(Equal(
+					[]owner.Owner{{"A", sigclient.ObjectKey{Namespace: "default", Name: "owner"}, schema.GroupKind{Group: "core", Kind: "Service"}}},
+				))
+			})
+
+			It("cross namespace", func() {
+				MustBeSuccessful(handler.SetOwner(cluster1, _owner, cluster1, _slaveOther))
+
+				Expect(handler.GetOwners(owner.LocalMatcher("", ""), "", _slaveOther)).To(Equal(
+					[]owner.Owner{{"", sigclient.ObjectKey{Namespace: "default", Name: "owner"}, schema.GroupKind{Group: "core", Kind: "Service"}}},
+				))
+
+				Expect(handler.GetOwners(owner.LocalMatcher("A", IdA), "", _slaveOther)).To(Equal(
+					[]owner.Owner{{"A", sigclient.ObjectKey{Namespace: "default", Name: "owner"}, schema.GroupKind{Group: "core", Kind: "Service"}}},
+				))
+			})
+		})
+
+		Context("remote", func() {
+
+			It("same namespace", func() {
+				MustBeSuccessful(handler.SetOwner(cluster1, _owner, cluster2, _slaveDefault))
+
+				Expect(handler.GetOwners(owner.LocalMatcher("", ""), "", _slaveDefault)).To(BeNil())
+				Expect(handler.GetOwners(owner.LocalMatcher("B", "IdB"), "IdB", _slaveDefault)).To(BeNil())
+
+				Expect(handler.GetOwners(owner.LocalMatcher("A", IdA), "IdB", _slaveDefault)).To(Equal(
+					[]owner.Owner{{"A", sigclient.ObjectKey{Namespace: "default", Name: "owner"}, schema.GroupKind{Group: "core", Kind: "Service"}}},
+				))
+			})
+
+			It("cross namespace", func() {
+				MustBeSuccessful(handler.SetOwner(cluster1, _owner, cluster2, _slaveOther))
+
+				Expect(handler.GetOwners(owner.LocalMatcher("", ""), "", _slaveOther)).To(BeNil())
+				Expect(handler.GetOwners(owner.LocalMatcher("B", "IdB"), "IdB", _slaveOther)).To(BeNil())
+
+				Expect(handler.GetOwners(owner.LocalMatcher("A", IdA), "IdB", _slaveOther)).To(Equal(
+					[]owner.Owner{{"A", sigclient.ObjectKey{Namespace: "default", Name: "owner"}, schema.GroupKind{Group: "core", Kind: "Service"}}},
+				))
+			})
+		})
+	})
+
+	Context("indexer", func() {
+		clusters := cluster.NewClusters()
+		clusters.Add(cluster1)
+		clusters.Add(cluster2)
+
+		It("for gk (match)", func() {
+			indexfunc := owner.Indexer[sigclient.Object](handler, owner.MatcherForClusters(clusters, ""), owner.ForGroupKind(schema.GroupKind{"core", "Service"}))
+
+			MustBeSuccessful(handler.SetOwner(cluster1, _owner, cluster1, _slaveDefault))
+
+			Expect(indexfunc(_slaveDefault)).To(Equal(
+				[]string{"/default/owner"},
+			))
+		})
+
+		It("for gk (no match)", func() {
+			indexfunc := owner.Indexer[sigclient.Object](handler, owner.MatcherForClusters(clusters, ""), owner.ForGroupKind(schema.GroupKind{"core", "ConfigMap"}))
+
+			MustBeSuccessful(handler.SetOwner(cluster1, _owner, cluster1, _slaveDefault))
+
+			Expect(indexfunc(_slaveDefault)).To(BeNil())
+		})
+
+		Context("non-cluster-aware", func() {
+			indexfunc := owner.Indexer[sigclient.Object](handler, owner.MatcherForClusters(clusters, ""))
+
+			Context("local", func() {
+				It("same namespace", func() {
+					MustBeSuccessful(handler.SetOwner(cluster1, _owner, cluster1, _slaveDefault))
+
+					Expect(indexfunc(_slaveDefault)).To(Equal(
+						[]string{"/default/owner/Service.core"},
+					))
+				})
+
+				It("cross namespace", func() {
+					MustBeSuccessful(handler.SetOwner(cluster1, _owner, cluster1, _slaveOther))
+
+					Expect(indexfunc(_slaveOther)).To(Equal(
+						[]string{"/default/owner/Service.core"},
+					))
+				})
+			})
+
+			Context("remote", func() {
+				It("same namespace", func() {
+					MustBeSuccessful(handler.SetOwner(cluster1, _owner, cluster2, _slaveDefault))
+
+					Expect(indexfunc(_slaveDefault)).To(Equal(
+						[]string{"A/default/owner/Service.core"},
+					))
+				})
+
+				It("cross namespace", func() {
+					MustBeSuccessful(handler.SetOwner(cluster1, _owner, cluster2, _slaveOther))
+
+					Expect(indexfunc(_slaveOther)).To(Equal(
+						[]string{"A/default/owner/Service.core"},
+					))
+				})
+			})
+		})
+
+		Context("cluster-aware", func() {
+			indexfunc := owner.Indexer[sigclient.Object](handler, owner.MatcherForClusters(clusters, "IdB"))
+
+			Context("local", func() {
+				It("same namespace", func() {
+					MustBeSuccessful(handler.SetOwner(cluster2, _owner, cluster2, _slaveDefault))
+
+					Expect(indexfunc(_slaveDefault)).To(Equal(
+						[]string{"B/default/owner/Service.core"},
+					))
+				})
+
+				It("cross namespace", func() {
+					MustBeSuccessful(handler.SetOwner(cluster2, _owner, cluster2, _slaveOther))
+
+					Expect(indexfunc(_slaveOther)).To(Equal(
+						[]string{"B/default/owner/Service.core"},
+					))
+				})
+			})
+
+			Context("remote", func() {
+				It("same namespace", func() {
+					MustBeSuccessful(handler.SetOwner(cluster1, _owner, cluster2, _slaveDefault))
+
+					Expect(indexfunc(_slaveDefault)).To(Equal(
+						[]string{"A/default/owner/Service.core"},
+					))
+				})
+
+				It("cross namespace", func() {
+					MustBeSuccessful(handler.SetOwner(cluster1, _owner, cluster2, _slaveOther))
+
+					Expect(indexfunc(_slaveOther)).To(Equal(
+						[]string{"A/default/owner/Service.core"},
+					))
+				})
+			})
 		})
 	})
 })

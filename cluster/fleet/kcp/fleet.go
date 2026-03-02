@@ -19,15 +19,15 @@ import (
 	"sigs.k8s.io/multicluster-runtime/pkg/multicluster"
 )
 
-type _fleet struct {
+type Fleet struct {
 	fpi.Support
 	wrapper       wrapper
 	registrations registrations
 }
 
-var _ fleet.Fleet = (*_fleet)(nil)
+var _ fleet.Fleet = (*Fleet)(nil)
 
-func New(t types.FleetType, name, id string, cfg *rest.Config, endpointSliceName string, options apiexport.Options) (*_fleet, error) {
+func New(t types.FleetType, name, id string, cfg *rest.Config, endpointSliceName string, options apiexport.Options) (*Fleet, error) {
 	if id == "" {
 		id = name
 	}
@@ -44,7 +44,7 @@ func New(t types.FleetType, name, id string, cfg *rest.Config, endpointSliceName
 	if err != nil {
 		return nil, err
 	}
-	f := &_fleet{
+	f := &Fleet{
 		wrapper: wrapper{
 			Provider: p,
 		},
@@ -62,7 +62,7 @@ func New(t types.FleetType, name, id string, cfg *rest.Config, endpointSliceName
 	return f, nil
 }
 
-func (k *_fleet) GetCluster(name string) types.Cluster {
+func (k *Fleet) GetCluster(name string) types.Cluster {
 	f, n := fpi.Split(name)
 	if f != k.GetName() && f != "" {
 		return nil
@@ -70,11 +70,11 @@ func (k *_fleet) GetCluster(name string) types.Cluster {
 	return k.registrations.GetCluster(n)
 }
 
-func (k *_fleet) GetClusterByLocalName(name string) types.Cluster {
+func (k *Fleet) GetClusterByLocalName(name string) types.Cluster {
 	return k.registrations.GetCluster(name)
 }
 
-func (k *_fleet) GetClusterById(id string) types.ClusterEquivalent {
+func (k *Fleet) GetClusterById(id string) types.ClusterEquivalent {
 	if id == k.GetId() {
 		return k
 	}
@@ -85,31 +85,31 @@ func (k *_fleet) GetClusterById(id string) types.ClusterEquivalent {
 	return k.registrations.GetCluster(n)
 }
 
-func (k *_fleet) GetInfo() string {
+func (k *Fleet) GetInfo() string {
 	return k.GetBaseCluster().GetConfig().Host
 }
 
-func (k *_fleet) GetTypeInfo() string {
+func (k *Fleet) GetTypeInfo() string {
 	return k.GetType().GetType() + " fleet"
 }
 
-func (k *_fleet) GetClusterNames() []string {
+func (k *Fleet) GetClusterNames() []string {
 	return k.registrations.GetClusterNames()
 }
 
-func (k *_fleet) GetEffective() types.ClusterEquivalent {
+func (k *Fleet) GetEffective() types.ClusterEquivalent {
 	return k
 }
 
-func (k *_fleet) AsCluster() types.Cluster {
+func (k *Fleet) AsCluster() types.Cluster {
 	return nil
 }
 
-func (k *_fleet) AsFleet() types.Fleet {
+func (k *Fleet) AsFleet() types.Fleet {
 	return k
 }
 
-func (k *_fleet) IsSameAs(o types.ClusterEquivalent) bool {
+func (k *Fleet) IsSameAs(o types.ClusterEquivalent) bool {
 	if o == nil {
 		return false
 	}
@@ -117,10 +117,14 @@ func (k *_fleet) IsSameAs(o types.ClusterEquivalent) bool {
 	if of == nil {
 		return false
 	}
-	if kcp, ok := of.(*_fleet); ok {
+	if kcp, ok := of.(*Fleet); ok {
 		return k == kcp
 	}
 	return false
+}
+
+func (f *Fleet) GetKCPProvider() *apiexport.Provider {
+	return f.wrapper.Provider
 }
 
 ////////////////////////////////////////////////////////////////////////////////

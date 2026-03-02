@@ -9,3 +9,5 @@ type Indices = types.Indices
 
 type ClusterEquivalent = types.ClusterEquivalent
 type Clusters = types.Clusters
+
+type ClustersAware[T any] = types.ClustersAware[T]

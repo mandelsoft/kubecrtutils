@@ -12,13 +12,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type IndexerFunc[T client.Object] = func(T) []string
+type IndexerFunc[T client.Object] = types.IndexerFunc[T]
+
+type IndexerFactory = types.ClustersAware[client.IndexerFunc]
 
 type Definition interface {
 	GetName() string
 	GetTarget() string
 	GetResource() client.Object
-	GetIndexerFunc() client.IndexerFunc
+	GetIndexer() IndexerFactory
 	Apply(ctx context.Context, set Clusters, logger logging.Logger) (types.Index, error)
 }
 
@@ -34,9 +36,9 @@ type TypedDefinition[P kubecrtutils.ObjectPointer[T], T any] interface {
 
 type _definition[P kubecrtutils.ObjectPointer[T], T any] struct {
 	internal.Element
-	target  string
-	proto   client.Object
-	idxfunc IndexerFunc[P]
+	target         string
+	proto          client.Object
+	indexerFactory IndexerFactory
 }
 
 type _reference[P kubecrtutils.ObjectPointer[T], T any] struct {
@@ -49,19 +51,19 @@ func (r *_reference[P, T]) IsRef() bool {
 
 func Ref[P kubecrtutils.ObjectPointer[T], T any](name string, target string) Reference {
 	return &_reference[P, T]{_definition[P, T]{
-		Element: internal.NewElement(name),
-		target:  target,
-		idxfunc: nil,
-		proto:   generics.ObjectFor[P](),
+		Element:        internal.NewElement(name),
+		target:         target,
+		indexerFactory: nil,
+		proto:          generics.ObjectFor[P](),
 	}}
 }
 
 func Define[P kubecrtutils.ObjectPointer[T], T any](name string, target string, idxfunc IndexerFunc[P]) TypedDefinition[P, T] {
 	return &_definition[P, T]{
-		Element: internal.NewElement(name),
-		target:  target,
-		idxfunc: idxfunc,
-		proto:   generics.ObjectFor[P](),
+		Element:        internal.NewElement(name),
+		target:         target,
+		indexerFactory: Lift(ConvertIndexerFunc(idxfunc)),
+		proto:          generics.ObjectFor[P](),
 	}
 }
 
@@ -73,16 +75,8 @@ func (d *_definition[P, T]) GetResource() client.Object {
 	return d.proto
 }
 
-func (d *_definition[P, T]) GetIndexerFunc() client.IndexerFunc {
-	if d.idxfunc == nil {
-		return nil
-	}
-	return d.indexer
-}
-
-func (d *_definition[P, T]) indexer(obj client.Object) []string {
-	return d.idxfunc(obj.(any).(P))
-
+func (d *_definition[P, T]) GetIndexer() IndexerFactory {
+	return d.indexerFactory
 }
 
 func (d *_definition[P, T]) Apply(ctx context.Context, set Clusters, logger logging.Logger) (types.Index, error) {
@@ -95,13 +89,17 @@ func (d *_definition[P, T]) Apply(ctx context.Context, set Clusters, logger logg
 	if err != nil {
 		return nil, fmt.Errorf("cannot determine group/kind for %T: %w", d.proto, err)
 	}
-	if d.GetIndexerFunc() == nil {
-		return nil, fmt.Errorf("indexer required for %T: %w", d.proto)
+	if d.GetIndexer() == nil {
+		return nil, fmt.Errorf("indexer required for %T", d.proto)
 	}
 
 	ilog := logger.WithName("index."+d.GetName()).WithValues("index", d.GetName())
+	f, err := d.indexerFactory(ctx, ilog, set)
+	if err != nil {
+		return nil, err
+	}
 	i := func(obj client.Object) []string {
-		r := d.idxfunc(obj.(any).(P))
+		r := f(obj)
 		if len(r) > 0 {
 			ilog.Info("indexing {{key}}: {{values}}", "key", client.ObjectKeyFromObject(obj), "values", fmt.Sprintf("%+v", r))
 		}

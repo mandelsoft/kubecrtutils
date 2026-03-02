@@ -68,7 +68,7 @@ func MapOwners[T client.Object](hdlr Handler, matcher ClusterMatcher, src types.
 		if cl == nil {
 			cl = clustercontext.ClusterFor(ctx)
 		}
-		owners := hdlr.GetOwners(matcher, cl, obj)
+		owners := hdlr.GetOwners(matcher, cl.GetId(), obj)
 
 		if len(owners) > 0 {
 			log[0].Info("found owners {{owner}} of modified object {{modified}}",

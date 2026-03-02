@@ -9,7 +9,7 @@ require (
 	github.com/kcp-dev/multicluster-provider v0.5.0
 	github.com/kcp-dev/sdk v0.30.0
 	github.com/mandelsoft/flagutils v0.0.0-20260105014053-ff948a418990
-	github.com/mandelsoft/goutils v0.0.0-20260209132453-cd86279dc63b
+	github.com/mandelsoft/goutils v0.0.0-20260226120828-1ef06f3d9aa1
 	github.com/mandelsoft/kubedns v0.0.0-00010101000000-000000000000
 	github.com/mandelsoft/logging v0.0.0-20260220094735-62d1006ceeb4
 	github.com/onsi/ginkgo/v2 v2.27.2
@@ -120,3 +120,4 @@ require (
 replace github.com/mandelsoft/kubedns => ../kubedns
 
 //replace sigs.k8s.io/multicluster-runtime => ../../../sigs.k8s.io/multicluster-runtime
+replace github.com/kcp-dev/multicluster-provider => ../../../github.com/kcp-dev/multicluster-provider

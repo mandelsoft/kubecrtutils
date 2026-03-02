@@ -7,10 +7,11 @@ import (
 	"github.com/mandelsoft/goutils/funcs"
 	"github.com/mandelsoft/goutils/general"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	apimtypes "k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const DEFAULT_SEPARATOR = "/"
+const DEFAULT_SEPARATOR = string(apimtypes.Separator)
 const DEFAULT_ANNOTATION_NAME = "cross-cluster.io/owner-id"
 
 type AnnotationType interface {

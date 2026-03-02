@@ -1,11 +1,8 @@
 package handler
 
 import (
-	"context"
-
 	"github.com/mandelsoft/kubecrtutils/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	sigcluster "sigs.k8s.io/controller-runtime/pkg/cluster"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	mcreconcile "sigs.k8s.io/multicluster-runtime/pkg/reconcile"
@@ -27,22 +24,6 @@ type TypedMapFuncFactory[object client.Object, request comparable] = ClusterAwar
 type ControllerAwareMapFuncFactory = TypedControllerAwareMapFuncFactory[client.Object, mcreconcile.Request]
 type TypedControllerAwareMapFuncFactory[T client.Object, R comparable] = ControllerAware[TypedMapFuncFactory[T, R]]
 type LocalTypedControllerAwareMapFuncFactory[T client.Object] = TypedControllerAwareMapFuncFactory[T, reconcile.Request]
-
-func Lift[F any](f F) ControllerAware[ClusterAware[F]] {
-	return LiftToController(LiftToCluster(f))
-}
-
-func LiftToCluster[F any](f F) ClusterAware[F] {
-	return func(clusterName string, cluster sigcluster.Cluster) F {
-		return f
-	}
-}
-
-func LiftToController[F any](f F) ControllerAware[F] {
-	return func(ctx context.Context, c types.Controller) (F, error) {
-		return f, nil
-	}
-}
 
 func TypedEnqueueRequestsFromMapFunc[T any, R comparable](fn TypedMapFunc[T, R]) TypedEventHandler[T, R] {
 	return handler.TypedEnqueueRequestsFromMapFunc[T, R](fn)

@@ -67,7 +67,7 @@ type ObjectToIndexKeyMapperFactory[T client.Object] = ControllerAware[ClusterAwa
 // is watched. All owners are tried to map to C objects using the index.
 // For those objects the reconcilation is triggered.
 func OwnerIndexTrigger[T client.Object](name string, converter ...IndexKeyTransformer[owner.Owner]) ResourceTriggerDefinition {
-	c := general.OptionalDefaulted[IndexKeyTransformer[owner.Owner]](owner.Owner.AsKey, converter...)
+	c := general.OptionalDefaulted[IndexKeyTransformer[owner.Owner]](func(o owner.Owner) string { return o.AsKey(true) }, converter...)
 	o := mapOwnersFactory[T](false)
 	m := GenericIndexKeyMapperByFactory(o, c)
 	return IndexTrigger[T](name, m)

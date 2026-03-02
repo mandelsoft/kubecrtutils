@@ -208,7 +208,7 @@ func registerIndex[I cacheindex.Index](logger logging.Logger, i cacheindex.Defin
 		return nil, fmt.Errorf("imported index %q[%s] not found", n, g)
 	}
 
-	f := i.GetIndexerFunc()
+	f := i.GetIndexer()
 	if f == nil {
 		logger.Info("  importing index {{index}}[{{global}}}", "index", n, "global", g)
 	} else {
