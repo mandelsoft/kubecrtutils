@@ -12,6 +12,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/options/mlogopts"
 	"github.com/mandelsoft/kubecrtutils/setup"
 	"github.com/spf13/pflag"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -20,7 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	// clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 
 	kcpapisv1alpha1 "github.com/kcp-dev/sdk/apis/apis/v1alpha1"
 	kcpcorev1alpha1 "github.com/kcp-dev/sdk/apis/core/v1alpha1"

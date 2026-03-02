@@ -46,6 +46,8 @@ func (r *ReconcileRequest) Reconcile() reconcile.Problem {
 	err := r.Cluster.GetCluster().GetClient().Get(r.Context, client.ObjectKey{Namespace: r.Namespace, Name: "dns-service"}, &secret)
 	if err == nil {
 		r.Info("ca.crt", "cert", secret.Data["ca.crt"])
+	} else {
+		r.Error("cannot get secret", "error", err)
 	}
 	_ = other
 	r.EnqueueByObject(r.Context, other)

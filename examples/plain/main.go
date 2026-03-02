@@ -24,7 +24,9 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/spf13/pflag"
 	v1 "k8s.io/api/core/v1"
+	runtime2 "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -36,7 +38,6 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -57,11 +58,18 @@ import (
 	corednsv1alpha1 "github.com/mandelsoft/kubedns/api/coredns/v1alpha1"
 )
 
+var (
+	myscheme = runtime2.NewScheme()
+)
+
 func init() {
-	runtime.Must(corev1alpha1.AddToScheme(scheme.Scheme))
-	runtime.Must(tenancyv1alpha1.AddToScheme(scheme.Scheme))
-	runtime.Must(apisv1alpha1.AddToScheme(scheme.Scheme))
-	runtime.Must(corednsv1alpha1.AddToScheme(scheme.Scheme))
+	runtime.Must(corev1alpha1.AddToScheme(myscheme))
+	runtime.Must(tenancyv1alpha1.AddToScheme(myscheme))
+	runtime.Must(apisv1alpha1.AddToScheme(myscheme))
+
+	runtime.Must(clientgoscheme.AddToScheme(myscheme))
+
+	runtime.Must(corednsv1alpha1.AddToScheme(myscheme))
 }
 
 const ANNOTATION = "mandelsoft.org/owner"
@@ -97,9 +105,13 @@ func main() {
 
 	// Setup a Manager, note that this not yet engages clusters, only makes them available.
 	entryLog.Info("Setting up manager")
-	opts := manager.Options{}
+	opts := manager.Options{
+		Scheme: myscheme,
+	}
 
-	kcpprovider, err := apiexport.New(cfg, endpointSlice, apiexport.Options{})
+	kcpprovider, err := apiexport.New(cfg, endpointSlice, apiexport.Options{
+		Scheme: myscheme,
+	})
 	if err != nil {
 		entryLog.Error(err, "unable to construct cluster provider")
 		os.Exit(1)
@@ -144,11 +156,14 @@ func main() {
 					return strings.HasPrefix(clusterName, "dataplane#")
 				}),
 		).
-		Watches(&v1.Secret{}, HandlerFactory(mgr.GetLogger()), mcbuilder.WithClusterFilter(
-			func(clusterName string, cluster cluster.Cluster) bool {
-				return clusterName == "#runtime"
-			}),
-		).
+		/*
+			Watches(&v1.Secret{}, HandlerFactory(mgr.GetLogger()), mcbuilder.WithClusterFilter(
+				func(clusterName string, cluster cluster.Cluster) bool {
+					return clusterName == "#runtime"
+				}),
+			).
+
+		*/
 		Complete(mcreconcile.Func(
 			func(ctx context.Context, req mcreconcile.Request) (ctrl.Result, error) {
 				log := log.FromContext(ctx).WithValues("cluster", req.ClusterName)
@@ -178,6 +193,7 @@ func main() {
 
 				err = cl.GetCache().Get(ctx, types.NamespacedName{Namespace: req.Namespace, Name: "dns-service"}, &secret)
 				if err == nil {
+					log.Info("string(ca.crt)", "cert", string(secret.Data["ca.crt"]))
 					log.Info("ca.crt", "cert", secret.Data["ca.crt"])
 				}
 				return reconcile.Result{}, nil
