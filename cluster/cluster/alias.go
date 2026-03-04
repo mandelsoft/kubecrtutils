@@ -49,8 +49,8 @@ func (a *_clusterAlias) mapNames(list []types.GlobalKey, err error) ([]types.Glo
 	return list, err
 }
 
-func (a *_clusterAlias) ListIndexedGlobalKeys(ctx context.Context, obj runtime.Object, index string, key string, opts ...client.ListOption) ([]types.GlobalKey, error) {
-	return a.mapNames(a.GetEffective().ListIndexedGlobalKeys(ctx, obj, index, key, opts...))
+func (a *_clusterAlias) ListGlobalKeys(ctx context.Context, obj runtime.Object, opts ...client.ListOption) ([]types.GlobalKey, error) {
+	return a.mapNames(a.GetEffective().ListGlobalKeys(ctx, obj, opts...))
 }
 
 func (a *_clusterAlias) ListIndexedGlobalKeysByObjectKey(ctx context.Context, obj runtime.Object, index string, key types.TypedGlobalKey, opts ...client.ListOption) ([]types.GlobalKey, error) {

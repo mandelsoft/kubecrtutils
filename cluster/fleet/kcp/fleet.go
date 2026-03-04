@@ -49,11 +49,12 @@ func New(t types.FleetType, name, id string, cfg *rest.Config, endpointSliceName
 			Provider: p,
 		},
 		registrations: registrations{
-			Composer:  fpi.NewComposer(name),
-			id:        fpi.NewComposer(id),
-			converter: conv,
-			clusters:  map[string]types.Cluster{},
-			log:       options.Log,
+			Composer:   fpi.NewComposer(name),
+			id:         fpi.NewComposer(id),
+			converter:  conv,
+			clusters:   map[string]types.Cluster{},
+			log:        options.Log,
+			configured: newConfigured(),
 		},
 	}
 	f.registrations.fleet = f
@@ -146,12 +147,13 @@ type registrations struct {
 	fpi.Composer
 	id fpi.Composer
 
-	lock      sync.Mutex
-	converter merge.Converters
-	clusters  map[string]types.Cluster
-	aware     multicluster.Aware
-	log       *logr.Logger
-	fleet     types.Fleet
+	lock       sync.Mutex
+	converter  merge.Converters
+	clusters   map[string]types.Cluster
+	aware      multicluster.Aware
+	log        *logr.Logger
+	fleet      types.Fleet
+	configured *configured
 }
 
 func (r *registrations) GetClusterNames() []string {
@@ -175,7 +177,7 @@ func (r *registrations) Engage(ctx context.Context, name string, cluster cluster
 	n := *u
 	n.Path = urlPath(u.Path, name)
 
-	cl, err := mycluster.NewClusterForCRTCluster(r.Compose(name), cluster, r.converter, id, &n)
+	cl, err := mycluster.NewClusterForCRTCluster(r.Compose(name), cluster, r.converter, id, &n, mycluster.Syncer(r.configured.Wait))
 	if err != nil {
 		return err
 	}
@@ -191,6 +193,10 @@ func (r *registrations) Engage(ctx context.Context, name string, cluster cluster
 		r.log.Info("disengage fleet cluster {{cluster}} for {{kind}} {{fleet}}", "cluster", name, "kind", r.fleet.GetTypeInfo(), "fleet", r.GetName())
 		delete(r.clusters, name)
 	}()
+	// ensure all indices are engaged before reconcilations are started.
+	// Therefore, the cluster Wait method will wait until engagement is completed.
+	// see order in clusters.Clusters from multicluster-runtime.
+	defer r.configured.Done()
 	return r.aware.Engage(ctx, name, cluster)
 }
 
@@ -213,4 +219,23 @@ func urlPath(provider string, name string) string {
 		p = r
 	}
 	return provider
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+type configured struct {
+	flag chan struct{}
+	once sync.Once
+}
+
+func newConfigured() *configured {
+	return &configured{flag: make(chan struct{})}
+}
+
+func (c *configured) Done() {
+	c.once.Do(func() { close(c.flag) })
+}
+
+func (c *configured) Wait() {
+	<-c.flag
 }

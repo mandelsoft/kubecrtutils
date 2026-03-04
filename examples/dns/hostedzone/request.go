@@ -31,13 +31,17 @@ func (r *ReconcileRequest) Reconcile() reconcile.Problem {
 	r.Info("URL {{url}}", "url", funcs.First(r.GetAPIServerURL()))
 
 	r.Info("global index for {{name}}", "name", r.Name)
-	list, err := r.GetController().GetCluster().ListIndexedGlobalKeys(r.Context, r.GetController().GetResource(), "IndexKeyZoneParent", r.Name)
+	err := r.List(r.Context, &v1alpha1.HostedZoneList{}, client.MatchingFields{"IndexKeyZoneParent": r.Name})
+	if err != nil {
+		r.Error("cluster index error: {{error}}", "error", err)
+	}
+	list, err := r.Reconciler.Dataplane.ListGlobalKeys(r.Context, r.GetController().GetResource(), client.MatchingFields{"IndexKeyZoneParent": r.Name})
 	if err == nil {
 		for _, e := range list {
 			r.Info("  found nested: {{cluster}} {{nested}}", "cluster", e.ClusterName, "nested", e.NamespacedName)
 		}
 	} else {
-		r.Error("index error: {{error}}", "error", err)
+		r.Error("fleet index error: {{error}}", "error", err)
 	}
 
 	{

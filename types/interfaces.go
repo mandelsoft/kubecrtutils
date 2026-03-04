@@ -218,12 +218,11 @@ type ClusterEquivalent interface {
 	// provided an error is returned.
 	List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error
 
-	// ListIndexedGlobalKeys provides a list of global object keys for objects indexed with the given index and key
+	// ListGlobalKeys provides a list of global object keys for objects
 	// for the given object type.
 	//
-	// For fleets the index refers to the complete cluster set represented by this cluster equivalent.
-	// The list options should not contain an index specification.
-	ListIndexedGlobalKeys(ctx context.Context, obj runtime.Object, index string, key string, opts ...client.ListOption) ([]GlobalKey, error)
+	// For fleets the complete cluster set represented by this cluster equivalent is used.
+	ListGlobalKeys(ctx context.Context, obj runtime.Object, opts ...client.ListOption) ([]GlobalKey, error)
 
 	// ListIndexedGlobalKeysByObjectKey provides a list of global object keys for objects indexed with the given index and key
 	// for the given object type.

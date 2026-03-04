@@ -92,8 +92,8 @@ func (a *_fleetAlias) mapNames(list []types.GlobalKey, err error) ([]types.Globa
 	return list, err
 }
 
-func (a *_fleetAlias) ListIndexedGlobalKeys(ctx context.Context, obj runtime.Object, index string, key string, opts ...client.ListOption) ([]types.GlobalKey, error) {
-	return a.mapNames(a.GetEffective().ListIndexedGlobalKeys(ctx, obj, index, key, opts...))
+func (a *_fleetAlias) ListGlobalKeys(ctx context.Context, obj runtime.Object, opts ...client.ListOption) ([]types.GlobalKey, error) {
+	return a.mapNames(a.GetEffective().ListGlobalKeys(ctx, obj, opts...))
 }
 
 func (a *_fleetAlias) ListIndexedGlobalKeysByObjectKey(ctx context.Context, obj runtime.Object, index string, key types.TypedGlobalKey, opts ...client.ListOption) ([]types.GlobalKey, error) {

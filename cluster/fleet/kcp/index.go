@@ -2,6 +2,8 @@ package kcp
 
 import (
 	"context"
+	"maps"
+	"slices"
 
 	"github.com/kcp-dev/logicalcluster/v3"
 	"github.com/mandelsoft/goutils/sliceutils"
@@ -12,7 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (f *Fleet) ListIndexedGlobalKeys(ctx context.Context, obj runtime.Object, index string, key string, opts ...client.ListOption) ([]types.GlobalKey, error) {
+func (f *Fleet) ListGlobalKeys(ctx context.Context, obj runtime.Object, opts ...client.ListOption) ([]types.GlobalKey, error) {
 	// unfortunately we cannot use unstructurued lists, here, because the cache is typically only configured for
 	// structured types, when the controller is working with structured types.
 	list, err := objutils.CreateObjectList(obj, f.GetScheme())
@@ -20,10 +22,20 @@ func (f *Fleet) ListIndexedGlobalKeys(ctx context.Context, obj runtime.Object, i
 		return nil, err
 	}
 
+	opts = slices.Clone(opts)
+	for i, o := range opts {
+		if s, ok := o.(client.MatchingFields); ok {
+			s = maps.Clone(s)
+			for k, v := range s {
+				s[k] = "*/" + v
+			}
+			opts[i] = s
+		}
+	}
 	var results []types.GlobalKey
 	for _, pp := range f.wrapper.Providers {
 		c := pp.GetCache()
-		err := c.List(ctx, list, sliceutils.CopyAppend[client.ListOption](opts, client.MatchingFields{index: "*/" + key})...)
+		err := c.List(ctx, list, opts...)
 		if err != nil {
 			return nil, err
 		}

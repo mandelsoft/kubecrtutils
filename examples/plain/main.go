@@ -148,6 +148,22 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err := kcpprovider.IndexField(
+		ctx,
+		&corednsv1alpha1.HostedZone{},
+		"IndexKeyZoneParent",
+		func(obj client.Object) []string {
+			r := obj.(*corednsv1alpha1.HostedZone)
+			if r.Spec.ParentRef == "" {
+				return nil
+			}
+			return []string{r.Spec.ParentRef}
+		},
+	); err != nil {
+		entryLog.Error(err, "unable to set up index")
+		os.Exit(1)
+	}
+
 	if err := mcbuilder.ControllerManagedBy(mgr).
 		Named("kcp-test-controller").
 		For(&corednsv1alpha1.HostedZone{},
@@ -173,11 +189,11 @@ func main() {
 				if err != nil {
 					return reconcile.Result{}, fmt.Errorf("failed to get cluster: %w", err)
 				}
-				client := cl.GetClient()
+				clt := cl.GetClient()
 
 				// Retrieve the ConfigMap from the cluster.
 				s := &corednsv1alpha1.HostedZone{}
-				if err := client.Get(ctx, req.NamespacedName, s); err != nil {
+				if err := clt.Get(ctx, req.NamespacedName, s); err != nil {
 					if apierrors.IsNotFound(err) {
 						log.Info("Zone deleted", "name", s.Name, "uuid", s.UID)
 						return reconcile.Result{}, nil
@@ -188,6 +204,13 @@ func main() {
 				log.Info("Reconciling Zone", "name", s.Name, "uuid", s.UID)
 				// recorder := cl.GetEventRecorderFor("kcp-configmap-controller")
 				// recorder.Eventf(s, corev1.EventTypeNormal, "Zone Reconciled", "Zone %s reconciled", s.Name)
+
+				err = cl.GetCache().List(ctx, &corednsv1alpha1.HostedZoneList{}, client.MatchingFields{"IndexKeyZoneParent": req.Name})
+				if err != nil {
+					log.Info("=== cluster index error: {{error}}", "error", err)
+				} else {
+					log.Info("=== cluster index found}")
+				}
 
 				var secret v1.Secret
 

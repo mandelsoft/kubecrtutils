@@ -22,6 +22,8 @@ import (
 	mcreconcile "sigs.k8s.io/multicluster-runtime/pkg/reconcile"
 )
 
+type Syncer func()
+
 type _cluster struct {
 	lock sync.Mutex
 	cluster.Cluster
@@ -33,6 +35,7 @@ type _cluster struct {
 	converter merge.Converters
 	start     sync.Once
 	indices   map[string]Index
+	syncer    Syncer
 	sync      sync.Once
 	apiServer *url.URL
 }
@@ -45,6 +48,7 @@ func NewClusterForCRTCluster(name string, c cluster.Cluster, opts ...any) (Clust
 	var cl client.Client
 	var conv merge.Converters
 	var apiServer *url.URL
+	var syncer Syncer
 	for _, o := range opts {
 		if o == nil {
 			continue
@@ -58,6 +62,8 @@ func NewClusterForCRTCluster(name string, c cluster.Cluster, opts ...any) (Clust
 			cl = v
 		case *url.URL:
 			apiServer = v
+		case Syncer:
+			syncer = v
 		default:
 			return nil, fmt.Errorf("unknown option type %T", v)
 		}
@@ -82,6 +88,7 @@ func NewClusterForCRTCluster(name string, c cluster.Cluster, opts ...any) (Clust
 		converter: conv,
 		indices:   map[string]Index{},
 		apiServer: apiServer,
+		syncer:    syncer,
 	}
 	r.TypedMux = enqueue.NewTypedMux[mcreconcile.Request](c.GetScheme(), r.createRequest)
 	return r, nil
@@ -248,6 +255,9 @@ func (c *_cluster) WaitForCacheSync(ctx context.Context) bool {
 	b := true
 	c.sync.Do(func() {
 		b = c.GetCache().WaitForCacheSync(ctx)
+		if c.syncer != nil {
+			c.syncer()
+		}
 	})
 	return b
 }

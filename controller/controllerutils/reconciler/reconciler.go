@@ -98,6 +98,10 @@ func (r *BaseRequest[T]) GetAfter() time.Duration {
 	return r.After
 }
 
+func (r *BaseRequest[T]) GetLogicalCluster(name string) types.ClusterEquivalent {
+	return r.GetController().GetLogicalCluster(name)
+}
+
 func (r *BaseRequest[T]) StatusChanged() bool {
 	n := reflect.ValueOf(r.Object).Elem().FieldByName("Status").Interface()
 	o := reflect.ValueOf(r.Orig).Elem().FieldByName("Status").Interface()

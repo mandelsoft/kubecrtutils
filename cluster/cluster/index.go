@@ -11,14 +11,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (c *_cluster) ListIndexedGlobalKeys(ctx context.Context, obj runtime.Object, index string, key string, opts ...client.ListOption) ([]types.GlobalKey, error) {
+func (c *_cluster) ListGlobalKeys(ctx context.Context, obj runtime.Object, opts ...client.ListOption) ([]types.GlobalKey, error) {
 	list, err := objutils.CreateObjectList(obj, c.GetScheme())
 	if err != nil {
 		return nil, err
 	}
 
 	var results []types.GlobalKey
-	err = c.List(ctx, list, sliceutils.CopyAppend[client.ListOption](opts, client.MatchingFields{index: key})...)
+	err = c.List(ctx, list, opts...)
 	if err == nil {
 		results = make([]types.GlobalKey, objutils.ObjectListLen(list))
 		for i, e := range objutils.Items(list) {
