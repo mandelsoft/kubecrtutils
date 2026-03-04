@@ -21,6 +21,13 @@ type GlobalKey struct {
 	apimtypes.NamespacedName
 }
 
+func NewGlobalKey(clusterName string, obj apimtypes.NamespacedName) GlobalKey {
+	return GlobalKey{
+		ClusterName:    clusterName,
+		NamespacedName: obj,
+	}
+}
+
 func ParseGlobalKey(key string) (*GlobalKey, error) {
 	fields := strings.Split(key, string(apimtypes.Separator))
 	if len(fields) != 3 {
@@ -33,6 +40,28 @@ func ParseGlobalKey(key string) (*GlobalKey, error) {
 			Name:      fields[2],
 		},
 	}, nil
+}
+
+func (o GlobalKey) GetClusterName() string {
+	return o.ClusterName
+}
+
+func (o GlobalKey) GetObjectKey() client.ObjectKey {
+	return o.NamespacedName
+}
+
+func (o GlobalKey) AsLocalKey() GlobalKey {
+	o.ClusterName = ""
+	return o
+}
+
+func (o GlobalKey) AsKey() string {
+	key := o.ClusterName + string(apimtypes.Separator)
+	return key + o.NamespacedName.String()
+}
+
+func (o GlobalKey) String() string {
+	return o.AsKey()
 }
 
 type TypedGlobalKey struct {
@@ -70,9 +99,18 @@ func NewGlobalTypedKey(clusterName string, obj apimtypes.NamespacedName, gk sche
 	}
 }
 
+func (o TypedGlobalKey) GetGroupKind() schema.GroupKind {
+	return o.GroupKind
+}
+
+func (o TypedGlobalKey) AsLocalKey() TypedGlobalKey {
+	o.ClusterName = ""
+	return o
+}
+
 func (o TypedGlobalKey) AsKey(useGK bool) string {
 	key := o.ClusterName + string(apimtypes.Separator)
-	if useGK {
+	if useGK && o.Kind != "" && o.Group != "" {
 		key += o.GroupKind.String() + string(apimtypes.Separator)
 	}
 	return key + o.NamespacedName.String()

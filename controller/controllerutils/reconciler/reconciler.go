@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/go-test/deep"
+	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/goutils/general"
 	"github.com/mandelsoft/kubecrtutils"
 	"github.com/mandelsoft/kubecrtutils/cluster"
@@ -15,6 +16,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/types"
 	"github.com/mandelsoft/logging"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	builder2 "sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -36,6 +38,8 @@ type ReconcileRequest[T client.Object] interface {
 	logging.Logger
 	cluster.Cluster
 	record.EventRecorder
+
+	GetOptions() flagutils.Options
 
 	GetKey() client.ObjectKey
 	GetObject() T
@@ -68,6 +72,14 @@ func (r *BaseRequest[T]) GenerateNameFor(tgt, prefix string, len ...int) string 
 
 func (r *BaseRequest[T]) GetController() types.Controller {
 	return r.controller
+}
+
+func (r *BaseRequest[T]) GetScheme() *runtime.Scheme {
+	return r.Cluster.GetScheme()
+}
+
+func (r *BaseRequest[T]) GetOptions() flagutils.Options {
+	return r.controller.GetOptions()
 }
 
 func (r *BaseRequest[T]) GetObject() T {

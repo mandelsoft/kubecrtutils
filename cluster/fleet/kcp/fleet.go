@@ -173,7 +173,7 @@ func (r *registrations) Engage(ctx context.Context, name string, cluster cluster
 		return err
 	}
 	n := *u
-	u.Path = urlPath(u.Path, name)
+	n.Path = urlPath(u.Path, name)
 
 	cl, err := mycluster.NewClusterForCRTCluster(r.Compose(name), cluster, r.converter, id, &n)
 	if err != nil {

@@ -70,11 +70,13 @@ type MappedControllerDefinition interface {
 
 type Controller interface {
 	GetName() string
+	GetOptions() flagutils.Options
 	GetFieldManager() string
 	GetLogger() logging.Logger
 	GetClusterMappings() Mappings
 	GetClusters() Clusters
 	GetCluster() ClusterEquivalent
+	GetLogicalCluster(name string) ClusterEquivalent
 	GetResource() client.Object
 	GetControllerManager() ControllerManager
 	GetRecoder(ctx context.Context) record.EventRecorder
@@ -215,6 +217,26 @@ type ClusterEquivalent interface {
 	// List for a fleet uses the cluster provided by the context. If no fleet member is
 	// provided an error is returned.
 	List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error
+
+	// ListIndexedGlobalKeys provides a list of global object keys for objects indexed with the given index and key
+	// for the given object type.
+	//
+	// For fleets the index refers to the complete cluster set represented by this cluster equivalent.
+	// The list options should not contain an index specification.
+	ListIndexedGlobalKeys(ctx context.Context, obj runtime.Object, index string, key string, opts ...client.ListOption) ([]GlobalKey, error)
+
+	// ListIndexedGlobalKeysByObjectKey provides a list of global object keys for objects indexed with the given index and key
+	// for the given object type.
+	//
+	// For fleets the index refers to the complete cluster set represented by this cluster equivalent.
+	// The list options should not contain an index specification.
+	// The key is again a global object key. The cluster name must be specified. The group/kind information
+	// is optional, depending on the used index function.
+	//
+	// For fleet indices the index function may return an empty cluster name for referring to the local cluster,
+	// because the MCRT library does not support cluster-aware index functions. The implementation for a fleet
+	// must compensate this.
+	ListIndexedGlobalKeysByObjectKey(ctx context.Context, obj runtime.Object, index string, key TypedGlobalKey, opts ...client.ListOption) ([]GlobalKey, error)
 
 	AsCluster() Cluster
 	AsFleet() Fleet

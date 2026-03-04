@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/goutils/general"
 	. "github.com/mandelsoft/kubecrtutils/log"
 
@@ -52,6 +53,10 @@ func (c *_controller[P, T]) GetName() string {
 	return c.definition.GetName()
 }
 
+func (c *_controller[P, T]) GetOptions() flagutils.Options {
+	return c.definition.GetOptions()
+}
+
 func (c *_controller[P, T]) GetOwnerHandler() owner.Handler {
 	return c.ohandler
 }
@@ -86,6 +91,10 @@ func (c *_controller[P, T]) GetDefinition() TypedDefinition[P, T] {
 
 func (c *_controller[P, T]) GetCluster() types.ClusterEquivalent {
 	return c.cluster
+}
+
+func (c *_controller[P, T]) GetLogicalCluster(name string) types.ClusterEquivalent {
+	return c.clusters.Get(name)
 }
 
 func (c *_controller[P, T]) GetRecoder(ctx context.Context) record.EventRecorder {
