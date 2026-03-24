@@ -11,4 +11,5 @@ type ClusterEquivalent = types.ClusterEquivalent
 type Fleet = types.Fleet
 type Cluster = types.Cluster
 type Clusters = types.Clusters
+type ClusterNames = types.ClusterNames
 type Index = types.Index

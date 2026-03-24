@@ -4,10 +4,9 @@ import (
 	"fmt"
 
 	"github.com/mandelsoft/kubecrtutils/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-func Map(clusters Clusters, mapping types.Mappings, names sets.Set[string]) (Clusters, error) {
+func Map(clusters Clusters, mapping types.Mappings, names ClusterNames) (Clusters, error) {
 	n := NewClusters()
 
 	for local := range names {

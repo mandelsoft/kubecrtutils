@@ -9,3 +9,4 @@ type MappedControllerDefinition = types.MappedControllerDefinition
 type ControllerDefinition = types.ControllerDefinition
 
 type Mappings = types.Mappings
+type ClusterNames = types.ClusterNames

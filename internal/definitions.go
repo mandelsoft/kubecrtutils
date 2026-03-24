@@ -3,6 +3,7 @@ package internal
 import (
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/goutils/errors"
+	"github.com/mandelsoft/goutils/maputils"
 	"github.com/spf13/pflag"
 )
 
@@ -11,6 +12,7 @@ type Definitions[T Named, D any] interface {
 	flagutils.OptionSetProvider
 	Add(elem ...T) D
 	Get(name string) T
+	GetNames() []string
 	GetError() error
 	Elements(yield func(string, T) bool)
 	Len() int
@@ -34,6 +36,10 @@ func NewDefinitions[T Named, D any](typ string, self D) DefinitionsImpl[T, D] {
 
 func (d *DefinitionsImpl[T, D]) GetTypeName() string {
 	return d.typename
+}
+
+func (d *DefinitionsImpl[T, D]) GetNames() []string {
+	return maputils.OrderedKeys(d.elements)
 }
 
 func (d *DefinitionsImpl[T, D]) Add(elems ...T) D {

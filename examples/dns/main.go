@@ -8,6 +8,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/cluster/fleet/kcp"
 	"github.com/mandelsoft/kubecrtutils/ctrlmgmt"
 	"github.com/mandelsoft/kubecrtutils/examples/dns/hostedzone"
+	"github.com/mandelsoft/kubecrtutils/options/activationopts"
 	"github.com/mandelsoft/kubecrtutils/options/metricsopts"
 	"github.com/mandelsoft/kubecrtutils/options/mlogopts"
 	"github.com/mandelsoft/kubecrtutils/setup"
@@ -61,6 +62,7 @@ func main() {
 	options := flagutils.DefaultOptionSet{}
 
 	options.Add(
+		activationopts.New(),
 		metricsopts.New(),  // options to control the manager metrics service
 		mlogopts.New(true), // options to control mandelsoft/logging
 		// other options

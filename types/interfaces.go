@@ -5,6 +5,7 @@ import (
 	"net/url"
 
 	"github.com/mandelsoft/flagutils"
+	"github.com/mandelsoft/goutils/set"
 	"github.com/mandelsoft/kubecrtutils/cluster/config"
 	"github.com/mandelsoft/kubecrtutils/enqueue"
 	"github.com/mandelsoft/kubecrtutils/internal"
@@ -12,7 +13,6 @@ import (
 	"github.com/mandelsoft/logging"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/cluster"
@@ -45,14 +45,18 @@ type ControllerManager interface {
 	GetControllerDefinition(name string) ControllerDefinition
 }
 
+type ClusterNames = set.Set[string]
+
 type ControllerDefinition interface {
 	flagutils.Options
 	GetName() string
 	GetCluster() string
-	GetClusters() sets.Set[string]
+	GetClusters() ClusterNames
 	GetResource() client.Object
+	GetGroups() set.Set[string]
 	GetWatchPredicates() []predicate.Predicate
 
+	GetRequiredClusters(mappings ControllerMappings) ClusterNames
 	GetError() error
 	GetOptions() flagutils.Options
 
@@ -63,6 +67,8 @@ type ControllerDefinition interface {
 	// a Controller
 	CreateController(ctx context.Context, mapping ControllerMappings, mgr ControllerManager) (Controller, error)
 }
+
+type ControllerNames = set.Set[string]
 
 type MappedControllerDefinition interface {
 	ControllerDefinition

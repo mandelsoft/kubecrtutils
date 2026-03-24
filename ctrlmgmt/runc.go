@@ -11,6 +11,7 @@ import (
 
 func Setup(name string, opts flagutils.OptionSet, def Definition, args ...string) error {
 	fs := pflag.NewFlagSet(name, pflag.ContinueOnError)
+	ctx := context.Background()
 
 	found := From(opts)
 	if found != nil {
@@ -23,17 +24,20 @@ func Setup(name string, opts flagutils.OptionSet, def Definition, args ...string
 		opts = options
 
 	}
+	if err := flagutils.Prepare(ctx, opts, nil); err != nil {
+		return err
+	}
 	opts.AddFlags(fs)
 
 	err := fs.Parse(args)
 	if err != nil {
 		return err
 	}
-	err = flagutils.Validate(context.Background(), opts, nil)
+	err = flagutils.Validate(ctx, opts, nil)
 	if err != nil {
 		return err
 	}
-	mgr, err := def.GetControllerManager(context.Background(), opts)
+	mgr, err := def.GetControllerManager(ctx, opts)
 	if err != nil {
 		return err
 	}

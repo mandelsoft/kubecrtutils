@@ -12,6 +12,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+type ClusterFilter interface {
+	GetUsedClusters() ClusterNames
+}
+
 func From(opts flagutils.OptionSetProvider) Definitions {
 	return flagutils.GetFrom[Definitions](opts)
 }
@@ -57,6 +61,14 @@ func (d *definitions) AddFlags(fs *pflag.FlagSet) {
 }
 
 func (d *definitions) Validate(ctx context.Context, opts flagutils.OptionSet, v flagutils.ValidationSet) error {
+	// don't establish validation dependencies, just access some metadata.
+	filter := flagutils.GetFrom[ClusterFilter](opts)
+
+	required := ClusterNames{}
+	if filter != nil {
+		required.AddAll(filter.GetUsedClusters())
+	}
+
 	if d.clusters == nil && d.GetError() == nil {
 		err := v.ValidateSet(ctx, opts, &d.DefinitionsImpl)
 		if err != nil {
@@ -70,48 +82,51 @@ func (d *definitions) Validate(ctx context.Context, opts flagutils.OptionSet, v 
 			missing = false
 			found = false
 			for n, def := range d.Elements {
-				if d.clusters.Get(n) == nil {
-					acc, err := def.Create(d)
-					if err != nil {
-						return d.AddError(err, "cluster ", n)
-					}
-					if acc != nil {
-						found = true
-						d.clusters.Add(acc)
-						continue
-					}
+				if d.clusters.Get(n) != nil || !required.Contains(n) {
+					continue
+				}
 
-					fb := def.GetFallback()
-					if fb == "" {
-						missing = true
-						continue
-					}
-					eff := d.clusters.Get(fb)
-					if eff != nil {
-						if !def.AcceptFleet() && eff.AsFleet() != nil {
-							return fmt.Errorf("fallback %q for cluster %q is fleet", def.GetName(), fb)
-						}
-						d.clusters.Add(NewAlias(n, eff))
-						found = true
-					} else {
-						if fb == DEFAULT {
-							err := v.Validate(ctx, opts, d.main)
-							if err != nil {
-								return d.AddError(err, "cluster ", d.main)
-							}
+				acc, err := def.Create(d)
+				if err != nil {
+					return d.AddError(err, "cluster ", n)
+				}
+				if acc != nil {
+					found = true
+					d.clusters.Add(acc)
+					continue
+				}
 
-							acc, err := d.main.Create(d)
-							if err != nil {
-								return d.AddError(err, "cluster ", d.main)
-							}
-							if acc != nil {
-								d.clusters.Add(acc)
-								found = true
-								continue
-							}
-						}
-						missing = true
+				fb := def.GetFallback()
+				if fb == "" {
+					missing = true
+					continue
+				}
+				eff := d.clusters.Get(fb)
+				if eff != nil {
+					if !def.AcceptFleet() && eff.AsFleet() != nil {
+						return fmt.Errorf("fallback %q for cluster %q is fleet", def.GetName(), fb)
 					}
+					d.clusters.Add(NewAlias(n, eff))
+					found = true
+				} else {
+					required.Add(fb)
+					if fb == DEFAULT {
+						err := v.Validate(ctx, opts, d.main)
+						if err != nil {
+							return d.AddError(err, "cluster ", d.main)
+						}
+
+						acc, err := d.main.Create(d)
+						if err != nil {
+							return d.AddError(err, "cluster ", d.main)
+						}
+						if acc != nil {
+							d.clusters.Add(acc)
+							found = true
+							continue
+						}
+					}
+					missing = true
 				}
 			}
 		}

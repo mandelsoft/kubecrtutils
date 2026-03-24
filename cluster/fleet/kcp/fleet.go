@@ -9,6 +9,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/kcp-dev/multicluster-provider/apiexport"
 	"github.com/mandelsoft/goutils/maputils"
+	"github.com/mandelsoft/kubecrtutils"
 	mycluster "github.com/mandelsoft/kubecrtutils/cluster/cluster"
 	"github.com/mandelsoft/kubecrtutils/cluster/fleet"
 	"github.com/mandelsoft/kubecrtutils/cluster/fleet/fpi"
@@ -54,7 +55,7 @@ func New(t types.FleetType, name, id string, cfg *rest.Config, endpointSliceName
 			converter:  conv,
 			clusters:   map[string]types.Cluster{},
 			log:        options.Log,
-			configured: newConfigured(),
+			configured: kubecrtutils.NewBarrier(),
 		},
 	}
 	f.registrations.fleet = f
@@ -153,7 +154,7 @@ type registrations struct {
 	aware      multicluster.Aware
 	log        *logr.Logger
 	fleet      types.Fleet
-	configured *configured
+	configured *kubecrtutils.Barrier
 }
 
 func (r *registrations) GetClusterNames() []string {
@@ -219,23 +220,4 @@ func urlPath(provider string, name string) string {
 		p = r
 	}
 	return provider
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-type configured struct {
-	flag chan struct{}
-	once sync.Once
-}
-
-func newConfigured() *configured {
-	return &configured{flag: make(chan struct{})}
-}
-
-func (c *configured) Done() {
-	c.once.Do(func() { close(c.flag) })
-}
-
-func (c *configured) Wait() {
-	<-c.flag
 }

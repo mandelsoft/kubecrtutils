@@ -3,6 +3,8 @@ package ctrlmgmt
 import (
 	"context"
 
+	"github.com/mandelsoft/goutils/set"
+	"github.com/mandelsoft/kubecrtutils/controller"
 	"github.com/mandelsoft/kubecrtutils/types"
 )
 
@@ -36,6 +38,8 @@ type _mappedController struct {
 	_controllerMappings
 }
 
+var _ controller.Definition = (*_mappedController)(nil)
+
 func WithMappings(def types.ControllerDefinition) MappedControllerDefinition {
 	return &_mappedController{
 		ControllerDefinition: def,
@@ -65,4 +69,13 @@ func (d *_mappedController) CreateController(ctx context.Context, mapping types.
 func (d *_mappedController) MapIndex(src, tgt string) MappedControllerDefinition {
 	d.indices[src] = tgt
 	return d
+}
+
+func (d *_mappedController) GetRequiredClusters(mappings types.ControllerMappings) ClusterNames {
+	names := set.New[string]()
+	m := d.ApplyTo(mappings).ClusterMappings()
+	for n := range d.GetClusters() {
+		names.Add(m.Map(n))
+	}
+	return names
 }

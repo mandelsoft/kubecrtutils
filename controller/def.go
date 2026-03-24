@@ -9,6 +9,7 @@ import (
 
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/goutils/generics"
+	"github.com/mandelsoft/goutils/set"
 	"github.com/mandelsoft/kubecrtutils"
 	"github.com/mandelsoft/kubecrtutils/cacheindex"
 	"github.com/mandelsoft/kubecrtutils/cluster"
@@ -19,7 +20,6 @@ import (
 	"github.com/mandelsoft/kubecrtutils/types"
 	"github.com/mandelsoft/logging"
 	"github.com/spf13/pflag"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -50,6 +50,7 @@ type TypedDefinition[P kubecrtutils.ObjectPointer[T], T any] interface {
 	ImportIndex(reference cacheindex.Reference) TypedDefinition[P, T]
 	AddTrigger(trigger ...ResourceTriggerDefinition) TypedDefinition[P, T]
 	UseCluster(name ...string) TypedDefinition[P, T]
+	InGroup(...string) TypedDefinition[P, T]
 }
 
 type _definition[P kubecrtutils.ObjectPointer[T], T any] struct {
@@ -57,12 +58,13 @@ type _definition[P kubecrtutils.ObjectPointer[T], T any] struct {
 	internal.ErrorContainer
 	predicates []predicate.Predicate
 	cluster    string
-	clusters   sets.Set[string]
+	clusters   ClusterNames
 	proto      client.Object
 	reconciler ReconcilerFactory[P, T]
 	indices    map[string]cacheindex.TypedDefinition[P, T]
 	imports    map[string]cacheindex.Definition
 	triggers   []ResourceTriggerDefinition
+	groups     set.Set[string]
 }
 
 func DefineByFunc[P kubecrtutils.ObjectPointer[T], T any](name string, cluster string, fac ReconcilerFactoryFunc[P, T]) TypedDefinition[P, T] {
@@ -74,12 +76,18 @@ func Define[P kubecrtutils.ObjectPointer[T], T any](name string, cluster string,
 		Element:        internal.NewElement(name),
 		ErrorContainer: *internal.NewErrorContainer(fmt.Sprintf("controller %s", name)),
 		cluster:        cluster,
-		clusters:       sets.New[string](cluster),
+		clusters:       set.New[string](cluster),
 		proto:          generics.ObjectFor[P](),
 		reconciler:     fac,
 		indices:        map[string]cacheindex.TypedDefinition[P, T]{},
 		imports:        map[string]cacheindex.Definition{},
+		groups:         set.New[string](),
 	}
+	return d
+}
+
+func (d *_definition[P, T]) InGroup(group ...string) TypedDefinition[P, T] {
+	d.groups.Add(group...)
 	return d
 }
 
@@ -89,7 +97,7 @@ func (d *_definition[P, T]) WithPredicates(preds ...predicate.Predicate) *_defin
 }
 
 func (d *_definition[P, T]) UseCluster(name ...string) TypedDefinition[P, T] {
-	d.clusters.Insert(name...)
+	d.clusters.Add(name...)
 	return d
 }
 
@@ -100,6 +108,7 @@ func (d *_definition[P, T]) AddIndex(name string, indexerFunc cacheindex.Indexer
 		i := cacheindex.Define[P, T](name, d.cluster, indexerFunc)
 		d.indices[name] = i
 		d.AddError(i, "index ", name)
+		d.clusters.Add(i.GetTarget())
 	}
 	return d
 }
@@ -118,7 +127,7 @@ func (d *_definition[P, T]) AddTrigger(trigger ...ResourceTriggerDefinition) Typ
 	for _, t := range trigger {
 		d.triggers = append(d.triggers, t)
 		if t.GetCluster() != "" {
-			d.clusters.Insert(t.GetCluster())
+			d.clusters.Add(t.GetCluster())
 		}
 	}
 	return d
@@ -155,8 +164,21 @@ func (d *_definition[P, T]) GetCluster() string {
 	return d.cluster
 }
 
-func (d *_definition[P, T]) GetClusters() sets.Set[string] {
+func (d *_definition[P, T]) GetClusters() ClusterNames {
 	return maps.Clone(d.clusters)
+}
+
+func (d *_definition[P, T]) GetRequiredClusters(mappings types.ControllerMappings) ClusterNames {
+	names := set.New[string]()
+	m := types.DefaultMappings(mappings).ClusterMappings()
+	for n := range d.GetClusters() {
+		names.Add(m.Map(n))
+	}
+	return names
+}
+
+func (d *_definition[T, P]) GetGroups() set.Set[string] {
+	return maps.Clone(d.groups)
 }
 
 func (d *_definition[T, P]) GetResource() client.Object {

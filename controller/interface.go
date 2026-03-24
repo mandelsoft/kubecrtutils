@@ -14,9 +14,12 @@ type ClusterAware[T any] = types.ClusterAware[T]
 
 type Controllers = types.Controllers
 type Controller = types.Controller
+type ControllerNames = types.ControllerNames
 
 type TypedController[P kubecrtutils.ObjectPointer[T], T any] interface {
 	Controller
 	GetDefinition() TypedDefinition[P, T]
 	GetLocalIndex(name string) cacheindex.TypedIndex[T]
 }
+
+type ClusterNames = types.ClusterNames
