@@ -7,6 +7,7 @@ import (
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/goutils/set"
 	"github.com/mandelsoft/kubecrtutils/cluster/config"
+	"github.com/mandelsoft/kubecrtutils/controller/constraints"
 	"github.com/mandelsoft/kubecrtutils/enqueue"
 	"github.com/mandelsoft/kubecrtutils/internal"
 	"github.com/mandelsoft/kubecrtutils/merge"
@@ -50,6 +51,8 @@ type ClusterNames = set.Set[string]
 type ControllerDefinition interface {
 	flagutils.Options
 	GetName() string
+
+	GetActivationConstraints() constraints.Constraints
 	GetCluster() string
 	GetClusters() ClusterNames
 	GetResource() client.Object
@@ -68,7 +71,7 @@ type ControllerDefinition interface {
 	CreateController(ctx context.Context, mapping ControllerMappings, mgr ControllerManager) (Controller, error)
 }
 
-type ControllerNames = set.Set[string]
+type ControllerNames = constraints.ControllerNames
 
 type MappedControllerDefinition interface {
 	ControllerDefinition

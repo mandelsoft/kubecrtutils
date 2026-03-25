@@ -7,7 +7,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/cacheindex"
 	"github.com/mandelsoft/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubecrtutils/controller"
-	"github.com/mandelsoft/kubecrtutils/controller/rules"
+	"github.com/mandelsoft/kubecrtutils/controller/constraints"
 	"github.com/mandelsoft/kubecrtutils/internal"
 	"github.com/mandelsoft/kubecrtutils/options/manageropts"
 	"github.com/spf13/pflag"
@@ -26,7 +26,7 @@ type Definition interface {
 	WithScheme(scheme *runtime.Scheme) Definition
 	AddCluster(def ...cluster.Definition) Definition
 	AddController(def ...controller.Definition) Definition
-	AddControllerRule(rules ...rules.Rule) Definition
+	AddControllerRule(rules ...constraints.Constraint) Definition
 	AddIndex(def ...cacheindex.Definition) Definition
 
 	GetController(name string) controller.Definition
@@ -68,7 +68,7 @@ func (d *definition) AddController(def ...controller.Definition) Definition {
 	d.controllers.Add(def...)
 	return d
 }
-func (d *definition) AddControllerRule(rules ...rules.Rule) Definition {
+func (d *definition) AddControllerRule(rules ...constraints.Constraint) Definition {
 	d.controllers.AddRule(rules...)
 	return d
 }

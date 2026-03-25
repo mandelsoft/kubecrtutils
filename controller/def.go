@@ -15,6 +15,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubecrtutils/cluster/clustercontext"
 	"github.com/mandelsoft/kubecrtutils/controller/builder"
+	"github.com/mandelsoft/kubecrtutils/controller/constraints"
 	"github.com/mandelsoft/kubecrtutils/internal"
 	"github.com/mandelsoft/kubecrtutils/owner"
 	"github.com/mandelsoft/kubecrtutils/types"
@@ -46,25 +47,31 @@ type TypedDefinition[P kubecrtutils.ObjectPointer[T], T any] interface {
 	GetReconciler() ReconcilerFactory[P, T]
 	GetTriggers() []ResourceTriggerDefinition
 
+	WithPredicates(preds ...predicate.Predicate) *_definition[P, T]
+	// WithActivationConstraint declares additional activation rules
+	// relevant if this controller is activated.
+	WithActivationConstraint(...constraints.Constraint) TypedDefinition[P, T]
+	InGroup(...string) TypedDefinition[P, T]
+
 	AddIndex(name string, indexerFunc cacheindex.IndexerFunc[P]) TypedDefinition[P, T]
 	ImportIndex(reference cacheindex.Reference) TypedDefinition[P, T]
 	AddTrigger(trigger ...ResourceTriggerDefinition) TypedDefinition[P, T]
 	UseCluster(name ...string) TypedDefinition[P, T]
-	InGroup(...string) TypedDefinition[P, T]
 }
 
 type _definition[P kubecrtutils.ObjectPointer[T], T any] struct {
 	internal.Element
 	internal.ErrorContainer
-	predicates []predicate.Predicate
-	cluster    string
-	clusters   ClusterNames
-	proto      client.Object
-	reconciler ReconcilerFactory[P, T]
-	indices    map[string]cacheindex.TypedDefinition[P, T]
-	imports    map[string]cacheindex.Definition
-	triggers   []ResourceTriggerDefinition
-	groups     set.Set[string]
+	predicates  []predicate.Predicate
+	cluster     string
+	clusters    ClusterNames
+	proto       client.Object
+	reconciler  ReconcilerFactory[P, T]
+	indices     map[string]cacheindex.TypedDefinition[P, T]
+	imports     map[string]cacheindex.Definition
+	triggers    []ResourceTriggerDefinition
+	constraints constraints.Constraints
+	groups      set.Set[string]
 }
 
 func DefineByFunc[P kubecrtutils.ObjectPointer[T], T any](name string, cluster string, fac ReconcilerFactoryFunc[P, T]) TypedDefinition[P, T] {
@@ -82,6 +89,7 @@ func Define[P kubecrtutils.ObjectPointer[T], T any](name string, cluster string,
 		indices:        map[string]cacheindex.TypedDefinition[P, T]{},
 		imports:        map[string]cacheindex.Definition{},
 		groups:         set.New[string](),
+		constraints:    constraints.New(),
 	}
 	return d
 }
@@ -98,6 +106,11 @@ func (d *_definition[P, T]) WithPredicates(preds ...predicate.Predicate) *_defin
 
 func (d *_definition[P, T]) UseCluster(name ...string) TypedDefinition[P, T] {
 	d.clusters.Add(name...)
+	return d
+}
+
+func (d *_definition[P, T]) WithActivationConstraint(constraints ...constraints.Constraint) TypedDefinition[P, T] {
+	d.constraints.Add(constraints...)
 	return d
 }
 
@@ -166,6 +179,10 @@ func (d *_definition[P, T]) GetCluster() string {
 
 func (d *_definition[P, T]) GetClusters() ClusterNames {
 	return maps.Clone(d.clusters)
+}
+
+func (d *_definition[P, T]) GetActivationConstraints() constraints.Constraints {
+	return d.constraints.Clone()
 }
 
 func (d *_definition[P, T]) GetRequiredClusters(mappings types.ControllerMappings) ClusterNames {

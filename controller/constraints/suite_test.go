@@ -1,4 +1,4 @@
-package rules_test
+package constraints_test
 
 import (
 	"testing"

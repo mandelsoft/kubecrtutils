@@ -7,7 +7,7 @@ import (
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/goutils/set"
 	"github.com/mandelsoft/kubecrtutils/cluster"
-	"github.com/mandelsoft/kubecrtutils/controller/rules"
+	"github.com/mandelsoft/kubecrtutils/controller/constraints"
 	"github.com/mandelsoft/kubecrtutils/internal"
 	"github.com/mandelsoft/kubecrtutils/options/activationopts"
 	"github.com/mandelsoft/kubecrtutils/types"
@@ -20,7 +20,7 @@ func From(opts flagutils.OptionSetProvider) Definitions {
 
 type Definitions interface {
 	internal.Definitions[Definition, Definitions]
-	AddRule(rules ...rules.Rule) Definitions
+	AddRule(...constraints.Constraint) Definitions
 
 	flagutils.Validatable
 
@@ -43,15 +43,15 @@ func (f *filter) Use(name string) bool {
 
 type _definitions struct {
 	internal.DefinitionsImpl[Definition, Definitions]
-	groups map[string][]string
-	rules  rules.Rules
-	filter filter
+	groups      map[string][]string
+	constraints constraints.Constraints
+	filter      filter
 }
 
 var _ Definitions = (*_definitions)(nil)
 
 func NewDefinitions() Definitions {
-	d := &_definitions{rules: rules.New()}
+	d := &_definitions{constraints: constraints.New()}
 	d.DefinitionsImpl = internal.NewDefinitions[Definition, Definitions]("index", d)
 	return d
 }
@@ -68,8 +68,8 @@ func (d *_definitions) Validate(ctx context.Context, opts flagutils.OptionSet, v
 	return v.ValidateSet(ctx, opts, d.AsOptionSet()) // forward validation
 }
 
-func (d *_definitions) AddRule(rules ...rules.Rule) Definitions {
-	d.rules.Add(rules...)
+func (d *_definitions) AddRule(constraints ...constraints.Constraint) Definitions {
+	d.constraints.Add(constraints...)
 	return d
 }
 
@@ -107,16 +107,30 @@ func (d *_definitions) Apply(ctx context.Context, mgr types.ControllerManager) (
 	if d.GetError() != nil {
 		return nil, d.GetError()
 	}
-	if d.rules.Len() > 0 {
-		list := d.filter.list
-		if list == nil {
-			list = set.New[string](d.GetNames()...)
+
+	cctx := constraints.NewContext(d.GetControllerSet())
+	list := d.filter.list
+	if list == nil {
+		list = set.New[string](d.GetNames()...)
+	}
+	err := d.constraints.Match(cctx, list)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, c := range d.Elements {
+		if !d.filter.Use(c.GetName()) {
+			continue
 		}
-		err := d.rules.Match(rules.NewContext(d.GetControllerSet()), list)
-		if err != nil {
-			return nil, err
+		cset := c.GetActivationConstraints()
+		if cset.Len() >= 0 {
+			err := cset.Match(cctx, list)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
+
 	for _, c := range d.Elements {
 		if !d.filter.Use(c.GetName()) {
 			continue // should we create indices if they are required elsewhere

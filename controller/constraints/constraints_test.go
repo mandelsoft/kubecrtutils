@@ -1,9 +1,9 @@
-package rules_test
+package constraints_test
 
 import (
 	"github.com/mandelsoft/goutils/set"
 	"github.com/mandelsoft/goutils/testutils"
-	"github.com/mandelsoft/kubecrtutils/controller/rules"
+	"github.com/mandelsoft/kubecrtutils/controller/constraints"
 	"github.com/mandelsoft/kubecrtutils/options/activationopts"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -35,7 +35,7 @@ var _ = Describe("Test Environment", func() {
 				"D": {"A", "D"},
 			},
 		}
-		ctx := rules.NewContext(cfg)
+		ctx := constraints.NewContext(cfg)
 
 		It("creates context", func() {
 			Expect(ctx.Names().AsArray()).To(ConsistOf("a", "b", "c", "d", "e"))
@@ -49,49 +49,49 @@ var _ = Describe("Test Environment", func() {
 		})
 
 		Context("complete", func() {
-			ruleset := rules.New().Add(rules.Complete("A"))
+			constraintset := constraints.New().Add(constraints.Complete("A"))
 			It("succeeds", func() {
 				cur := set.New[string]("a", "b", "c")
-				testutils.MustBeSuccessful(ruleset.Match(ctx, cur))
+				testutils.MustBeSuccessful(constraintset.Match(ctx, cur))
 			})
 			It("failes", func() {
 				cur := set.New[string]("a")
-				Expect(ruleset.Match(ctx, cur)).To(MatchError("group \"A\" must be complete [a, b]"))
+				Expect(constraintset.Match(ctx, cur)).To(MatchError("group \"A\" must be complete [a, b]"))
 			})
 
-			It("succeeds for one rule with two groups", func() {
-				ruleset := rules.New().Add(rules.Complete("A", "B"))
+			It("succeeds for one constraint with two groups", func() {
+				constraintset := constraints.New().Add(constraints.Complete("A", "B"))
 				cur := set.New[string]("a", "b", "c", "d")
-				testutils.MustBeSuccessful(ruleset.Match(ctx, cur))
+				testutils.MustBeSuccessful(constraintset.Match(ctx, cur))
 			})
-			It("succeeds for two rules", func() {
-				ruleset := rules.New().Add(rules.Complete("A")).Add(rules.Complete("B"))
+			It("succeeds for two constraints", func() {
+				constraintset := constraints.New().Add(constraints.Complete("A")).Add(constraints.Complete("B"))
 				cur := set.New[string]("a", "b", "c", "d")
-				testutils.MustBeSuccessful(ruleset.Match(ctx, cur))
+				testutils.MustBeSuccessful(constraintset.Match(ctx, cur))
 			})
 
-			It("fails for one rule with two groups", func() {
-				ruleset := rules.New().Add(rules.Complete("A", "B"))
+			It("fails for one constraint with two groups", func() {
+				constraintset := constraints.New().Add(constraints.Complete("A", "B"))
 				cur := set.New[string]("a", "b", "d")
-				Expect(ruleset.Match(ctx, cur)).To(MatchError("group \"B\" must be complete [c, d]"))
+				Expect(constraintset.Match(ctx, cur)).To(MatchError("group \"B\" must be complete [c, d]"))
 			})
-			It("succeeds for two rules", func() {
-				ruleset := rules.New().Add(rules.Complete("A")).Add(rules.Complete("B"))
+			It("succeeds for two constraints", func() {
+				constraintset := constraints.New().Add(constraints.Complete("A")).Add(constraints.Complete("B"))
 				cur := set.New[string]("a", "b", "d")
-				Expect(ruleset.Match(ctx, cur)).To(MatchError("group \"B\" must be complete [c, d]"))
+				Expect(constraintset.Match(ctx, cur)).To(MatchError("group \"B\" must be complete [c, d]"))
 			})
 		})
 
 		Context("disjoint", func() {
-			ruleset := rules.New().Add(rules.Disjoint("A", "B"))
+			constraintset := constraints.New().Add(constraints.Disjoint("A", "B"))
 			It("succeeds", func() {
 				cur := set.New[string]("a", "e")
-				testutils.MustBeSuccessful(ruleset.Match(ctx, cur))
+				testutils.MustBeSuccessful(constraintset.Match(ctx, cur))
 			})
 
 			It("failes", func() {
 				cur := set.New[string]("a", "b", "c")
-				Expect(ruleset.Match(ctx, cur)).To(MatchError("use only controllers either in group \"A\" or \"B\""))
+				Expect(constraintset.Match(ctx, cur)).To(MatchError("use only controllers either in group \"A\" or \"B\""))
 			})
 		})
 	})

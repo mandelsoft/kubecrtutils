@@ -1,22 +1,21 @@
-package rules
+package constraints
 
 import (
 	"fmt"
 	"strings"
 
 	"github.com/mandelsoft/goutils/maputils"
-	"github.com/mandelsoft/kubecrtutils/types"
 )
 
 type _complete struct {
 	groups []string
 }
 
-func Complete(grps ...string) Rule {
+func Complete(grps ...string) Constraint {
 	return &_complete{groups: grps}
 }
 
-func (r *_complete) Match(ctx *Context, cur types.ControllerNames) error {
+func (r *_complete) Match(ctx *Context, cur ControllerNames) error {
 	for _, group := range r.groups {
 		g := ctx.GetGroup(group)
 		if g == nil {

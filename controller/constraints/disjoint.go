@@ -1,20 +1,18 @@
-package rules
+package constraints
 
 import (
 	"fmt"
-
-	"github.com/mandelsoft/kubecrtutils/types"
 )
 
 type _disjoint struct {
 	groups []string
 }
 
-func Disjoint(grps ...string) Rule {
+func Disjoint(grps ...string) Constraint {
 	return &_disjoint{groups: grps}
 }
 
-func (r *_disjoint) Match(ctx *Context, cur types.ControllerNames) error {
+func (r *_disjoint) Match(ctx *Context, cur ControllerNames) error {
 
 	for i := 0; i < len(r.groups); i++ {
 		found := ""
