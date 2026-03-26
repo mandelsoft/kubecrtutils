@@ -58,7 +58,7 @@ func (f *ReconcilerFactory[O, S, P, T]) CreateReconciler(ctx context.Context, co
 		Controller:   controller,
 		Logger:       controller.GetLogger(),
 		FieldManager: controller.GetFieldManager(),
-		Finalizer:    controller.GetFieldManager(),
+		Finalizer:    controller.GetFinalizer(),
 		GroupKind: schema.GroupKind{
 			Group: gvks[0].Group,
 			Kind:  gvks[0].Kind,

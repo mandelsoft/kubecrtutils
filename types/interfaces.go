@@ -58,6 +58,7 @@ type ControllerDefinition interface {
 	GetResource() client.Object
 	GetGroups() set.Set[string]
 	GetWatchPredicates() []predicate.Predicate
+	GetFinalizer() string
 
 	GetRequiredClusters(mappings ControllerMappings) ClusterNames
 	GetError() error
@@ -81,6 +82,7 @@ type Controller interface {
 	GetName() string
 	GetOptions() flagutils.Options
 	GetFieldManager() string
+	GetFinalizer() string
 	GetLogger() logging.Logger
 	GetClusterMappings() Mappings
 	GetClusters() Clusters

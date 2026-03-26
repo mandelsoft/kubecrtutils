@@ -47,6 +47,7 @@ type TypedDefinition[P kubecrtutils.ObjectPointer[T], T any] interface {
 	GetReconciler() ReconcilerFactory[P, T]
 	GetTriggers() []ResourceTriggerDefinition
 
+	WithFinalizer(string) *_definition[P, T]
 	WithPredicates(preds ...predicate.Predicate) *_definition[P, T]
 	// WithActivationConstraint declares additional activation rules
 	// relevant if this controller is activated.
@@ -72,6 +73,7 @@ type _definition[P kubecrtutils.ObjectPointer[T], T any] struct {
 	triggers    []ResourceTriggerDefinition
 	constraints constraints.Constraints
 	groups      set.Set[string]
+	finalizer   string
 }
 
 func DefineByFunc[P kubecrtutils.ObjectPointer[T], T any](name string, cluster string, fac ReconcilerFactoryFunc[P, T]) TypedDefinition[P, T] {
@@ -101,6 +103,11 @@ func (d *_definition[P, T]) InGroup(group ...string) TypedDefinition[P, T] {
 
 func (d *_definition[P, T]) WithPredicates(preds ...predicate.Predicate) *_definition[P, T] {
 	d.predicates = append(d.predicates, preds...)
+	return d
+}
+
+func (d *_definition[P, T]) WithFinalizer(s string) *_definition[P, T] {
+	d.finalizer = s
 	return d
 }
 
@@ -178,6 +185,13 @@ func (d *_definition[P, T]) Finalize(ctx context.Context, opts flagutils.OptionS
 
 func (d *_definition[P, T]) GetCluster() string {
 	return d.cluster
+}
+
+func (d *_definition[P, T]) GetFinalizer() string {
+	if d.finalizer == "" {
+		return d.GetName()
+	}
+	return d.finalizer
 }
 
 func (d *_definition[P, T]) GetClusters() ClusterNames {

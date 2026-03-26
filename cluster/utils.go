@@ -7,6 +7,7 @@ import (
 
 	"github.com/mandelsoft/goutils/general"
 	"github.com/mandelsoft/goutils/generics"
+	"github.com/mandelsoft/kubecrtutils/cluster/cluster"
 	"github.com/mandelsoft/kubecrtutils/merge"
 	"github.com/mandelsoft/kubecrtutils/objutils"
 	"github.com/mandelsoft/kubecrtutils/types"
@@ -264,8 +265,15 @@ func ClientSideApply(c Cluster, ctx OperationContext, manifest []byte, mod ...*M
 }
 
 func ClientSideApplyObject(c Cluster, ctx OperationContext, src, dst client.Object, mod ...*ModificationInfo) (client.Object, error) {
-	desired := src.DeepCopyObject().(client.Object)
-	gvk := desired.GetObjectKind().GroupVersionKind()
+	if src.GetName() == "test" {
+		x := 1
+		_ = x
+	}
+
+	desired, err := ToUnstructured(src.DeepCopyObject().(client.Object))
+	if err != nil {
+		return nil, err
+	}
 
 	// 1. Decode bytes into a 'current' unstructured object
 	current, err := ToUnstructured(dst)
@@ -279,6 +287,8 @@ func ClientSideApplyObject(c Cluster, ctx OperationContext, src, dst client.Obje
 		return nil, fmt.Errorf("failed to modify manifest: %w", err)
 	}
 
+	gvk := desired.GetObjectKind().GroupVersionKind()
+
 	if errors.IsNotFound(err) {
 		general.Optional(mod...).SetCreated()
 		ctx.Info("creating resource", "cluster", c.GetName(), "name", desired.GetName(), "namespace", desired.GetNamespace(), "groupkind", gvk)
@@ -290,6 +300,24 @@ func ClientSideApplyObject(c Cluster, ctx OperationContext, src, dst client.Obje
 		return desired, err
 	}
 
+	patchData, err := CreatePatchData(c, desired, current, ctx.GetFieldManager())
+	if err != nil {
+		return nil, err
+	}
+
+	if string(patchData) == "{}" {
+		ctx.Info("resource uptodate {{groupkind}} {{namespace}}/{{name}} in {{cluster}}", "cluster", c.GetName(), "name", desired.GetName(), "namespace", desired.GetNamespace(), "groupkind", gvk)
+		return desired, nil // No changes, exit early
+	}
+	rawPatch := client.RawPatch(apimachtypes.MergePatchType, patchData)
+	general.Optional(mod...).SetUpdated()
+	ctx.Info("apply patch for {{groupkind}} {{namespace}}/{{name}} in {{cluster}}", "cluster", c.GetName(), "name", desired.GetName(), "namespace", desired.GetNamespace(), "groupkind", gvk, "patch", string(patchData))
+	return desired, c.Patch(ctx, current, rawPatch, &client.PatchOptions{
+		FieldManager: ctx.GetFieldManager(),
+	})
+}
+
+func CreatePatchData(c cluster.Cluster, desired, current *unstructured.Unstructured, fm string) ([]byte, error) {
 	// keep KCP info
 	for n, v := range current.GetAnnotations() {
 		if strings.HasSuffix(v, ".kcp.io") {
@@ -301,14 +329,20 @@ func ClientSideApplyObject(c Cluster, ctx OperationContext, src, dst client.Obje
 			desired.GetLabels()[n] = v
 		}
 	}
-	m, err := merge.NewObjectMerger(c.GetTypeConverter(), c.GetScheme(), ctx.GetFieldManager())
-	if err != nil {
-		return nil, err
-	}
 
-	tmp, err := m.MergeObservingManagedFields(current, desired)
-	if err != nil {
-		return nil, err
+	var tmp *unstructured.Unstructured
+	if fm == "" {
+		tmp = desired.DeepCopy()
+	} else {
+		m, err := merge.NewObjectMerger(c.GetTypeConverter(), c.GetScheme(), fm)
+		if err != nil {
+			return nil, err
+		}
+
+		tmp, err = m.MergeObservingManagedFields(current, desired)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// PATH B: Patch existing object
@@ -331,22 +365,7 @@ func ClientSideApplyObject(c Cluster, ctx OperationContext, src, dst client.Obje
 	}
 	current.SetLabels(desired.GetLabels())
 
-	patchData, err := patch.Data(current)
-	if err != nil {
-		return nil, err
-	}
-
-	rawPatch := client.RawPatch(apimachtypes.MergePatchType, patchData)
-	if string(patchData) == "{}" {
-		ctx.Info("resource uptodate {{groupkind}} {{namespace}}/{{name}} in {{cluster}}", "cluster", c.GetName(), "name", desired.GetName(), "namespace", desired.GetNamespace(), "groupkind", gvk)
-
-		return desired, nil // No changes, exit early
-	}
-	general.Optional(mod...).SetUpdated()
-	ctx.Info("apply patch for {{groupkind}} {{namespace}}/{{name}} in {{cluster}}", "cluster", c.GetName(), "name", desired.GetName(), "namespace", desired.GetNamespace(), "groupkind", gvk, "patch", string(patchData))
-	return desired, c.Patch(ctx, current, rawPatch, &client.PatchOptions{
-		FieldManager: ctx.GetFieldManager(),
-	})
+	return patch.Data(current)
 }
 
 func ToUnstructured(obj client.Object) (*unstructured.Unstructured, error) {

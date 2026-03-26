@@ -65,6 +65,10 @@ func (c *_controller[P, T]) GetFieldManager() string {
 	return c.controllerManager.GetName() + "/" + c.definition.GetName()
 }
 
+func (c *_controller[P, T]) GetFinalizer() string {
+	return c.controllerManager.GetName() + "/" + c.definition.GetFinalizer()
+}
+
 func (c *_controller[P, T]) GetLogger() logging.Logger {
 	return c.logger
 }
