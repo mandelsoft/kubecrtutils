@@ -156,7 +156,10 @@ func (d *_definition[P, T]) AsOptionSet() flagutils.OptionSet {
 	if o, ok := d.reconciler.(flagutils.OptionSetProvider); ok {
 		return o.AsOptionSet()
 	}
-	return flagutils.DefaultOptionSet{}
+	if o, ok := d.reconciler.(flagutils.Options); ok {
+		return flagutils.NewOptionSet(o)
+	}
+	return flagutils.NewOptionSet()
 }
 
 func (d *_definition[P, T]) Validate(ctx context.Context, opts flagutils.OptionSet, v flagutils.ValidationSet) error {

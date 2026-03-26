@@ -207,12 +207,12 @@ func ClientSideApply(c Cluster, ctx OperationContext, manifest []byte, mod ...*M
 
 	for n, v := range current.GetAnnotations() {
 		if strings.HasSuffix(v, ".kcp.io") {
-			current.GetAnnotations()[n] = v
+			objutils.SetAnnotation(&current, n, v)
 		}
 	}
 	for n, v := range current.GetLabels() {
 		if strings.HasSuffix(v, ".kcp.io") {
-			current.GetLabels()[n] = v
+			objutils.Setlabel(&current, n, v)
 		}
 	}
 	m, err := merge.NewObjectMerger(c.GetTypeConverter(), c.GetScheme(), ctx.GetFieldManager())
@@ -261,6 +261,100 @@ func ClientSideApply(c Cluster, ctx OperationContext, manifest []byte, mod ...*M
 	return &desired, c.Patch(ctx, &current, rawPatch, &client.PatchOptions{
 		FieldManager: ctx.GetFieldManager(),
 	})
+}
+
+func ClientSideApplyObject(c Cluster, ctx OperationContext, src, dst client.Object, mod ...*ModificationInfo) (client.Object, error) {
+	desired := src.DeepCopyObject().(client.Object)
+	gvk := desired.GetObjectKind().GroupVersionKind()
+
+	// 1. Decode bytes into a 'current' unstructured object
+	current, err := ToUnstructured(dst)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. give context the chance to modify object
+	err = ctx.Modify(c, desired)
+	if err != nil {
+		return nil, fmt.Errorf("failed to modify manifest: %w", err)
+	}
+
+	if errors.IsNotFound(err) {
+		general.Optional(mod...).SetCreated()
+		ctx.Info("creating resource", "cluster", c.GetName(), "name", desired.GetName(), "namespace", desired.GetNamespace(), "groupkind", gvk)
+		return desired, c.Create(ctx, desired, &client.CreateOptions{
+			// PATH A: Create if not found
+			FieldManager: ctx.GetFieldManager(),
+		})
+	} else if err != nil {
+		return desired, err
+	}
+
+	// keep KCP info
+	for n, v := range current.GetAnnotations() {
+		if strings.HasSuffix(v, ".kcp.io") {
+			desired.GetAnnotations()[n] = v
+		}
+	}
+	for n, v := range current.GetLabels() {
+		if strings.HasSuffix(v, ".kcp.io") {
+			desired.GetLabels()[n] = v
+		}
+	}
+	m, err := merge.NewObjectMerger(c.GetTypeConverter(), c.GetScheme(), ctx.GetFieldManager())
+	if err != nil {
+		return nil, err
+	}
+
+	tmp, err := m.MergeObservingManagedFields(current, desired)
+	if err != nil {
+		return nil, err
+	}
+
+	// PATH B: Patch existing object
+	// We use 'current' as the base. We only want to update the 'spec' (or other non-system fields).
+	// IMPORTANT: To preserve status/finalizers, we ensure they aren't overwritten in 'desired'.
+
+	// Create a patch object that calculates the diff between 'current' and 'desired'
+	patch := client.MergeFrom(current.DeepCopyObject().(client.Object))
+
+	// Apply the patch to 'current' using our 'desired' state
+	// Note: We update 'current' with 'desired' fields here
+
+	for k, v := range tmp.Object {
+		if k != "metadata" {
+			current.Object[k] = v
+		}
+	}
+	for k, v := range desired.GetAnnotations() {
+		objutils.SetAnnotation(current, k, v)
+	}
+	current.SetLabels(desired.GetLabels())
+
+	patchData, err := patch.Data(current)
+	if err != nil {
+		return nil, err
+	}
+
+	rawPatch := client.RawPatch(apimachtypes.MergePatchType, patchData)
+	if string(patchData) == "{}" {
+		ctx.Info("resource uptodate {{groupkind}} {{namespace}}/{{name}} in {{cluster}}", "cluster", c.GetName(), "name", desired.GetName(), "namespace", desired.GetNamespace(), "groupkind", gvk)
+
+		return desired, nil // No changes, exit early
+	}
+	general.Optional(mod...).SetUpdated()
+	ctx.Info("apply patch for {{groupkind}} {{namespace}}/{{name}} in {{cluster}}", "cluster", c.GetName(), "name", desired.GetName(), "namespace", desired.GetNamespace(), "groupkind", gvk, "patch", string(patchData))
+	return desired, c.Patch(ctx, current, rawPatch, &client.PatchOptions{
+		FieldManager: ctx.GetFieldManager(),
+	})
+}
+
+func ToUnstructured(obj client.Object) (*unstructured.Unstructured, error) {
+	data, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
+	if err != nil {
+		return nil, err
+	}
+	return &unstructured.Unstructured{Object: data}, nil
 }
 
 type modificationWrapper struct {

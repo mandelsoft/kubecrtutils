@@ -85,7 +85,7 @@ func (d *definition) AddFlags(fs *pflag.FlagSet) {
 }
 
 func (d *definition) AsOptionSet() flagutils.OptionSet {
-	return d.options
+	return &d.options
 }
 
 func (d *definition) GetController(name string) controller.Definition {

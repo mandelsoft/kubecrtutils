@@ -4,15 +4,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type AnnotationModifier func(map[string]string) map[string]string
+type AnnotationModifier = func(map[string]string) map[string]string
 
 func SetAnnotation(obj metav1.Object, key, value string) {
-	annotations := obj.GetAnnotations()
-	if annotations == nil {
-		annotations = map[string]string{}
+	values := obj.GetAnnotations()
+	if values == nil {
+		values = map[string]string{}
 	}
-	annotations[key] = value
-	obj.SetAnnotations(annotations)
+	values[key] = value
+	obj.SetAnnotations(values)
 }
 
 func ModifyAnnotations(obj metav1.Object, mod AnnotationModifier) {
@@ -22,9 +22,19 @@ func ModifyAnnotations(obj metav1.Object, mod AnnotationModifier) {
 }
 
 func GetAnnotation(obj metav1.Object, key string) string {
-	annotations := obj.GetAnnotations()
-	if annotations == nil {
+	values := obj.GetAnnotations()
+	if values == nil {
 		return ""
 	}
-	return annotations[key]
+	return values[key]
+}
+
+func RemoveAnnotation(obj metav1.Object, key string) bool {
+	values := obj.GetAnnotations()
+	if values == nil {
+		return false
+	}
+	_, ok := values[key]
+	delete(values, key)
+	return ok
 }

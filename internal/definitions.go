@@ -60,5 +60,5 @@ func (d *DefinitionsImpl[T, D]) AddFlags(fs *pflag.FlagSet) {
 }
 
 func (d *DefinitionsImpl[T, D]) AsOptionSet() flagutils.OptionSet {
-	return d.options
+	return &d.options
 }

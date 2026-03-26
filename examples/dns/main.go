@@ -59,9 +59,7 @@ func main() {
 			hostedzone.Controller(),
 		)
 
-	options := flagutils.DefaultOptionSet{}
-
-	options.Add(
+	options := flagutils.NewOptionSet(
 		activationopts.New(),
 		metricsopts.New(),  // options to control the manager metrics service
 		mlogopts.New(true), // options to control mandelsoft/logging

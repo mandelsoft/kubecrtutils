@@ -84,7 +84,7 @@ func (r *_rules) PersonalizedWith(o *Personalization) Rules {
 ////////////////////////////////////////////////////////////////////////////////
 
 func (r *_rules) AsOptionSet() flagutils.OptionSet {
-	return r.options
+	return &r.options
 }
 
 func (r *_rules) AddFlags(fs *pflag.FlagSet) {

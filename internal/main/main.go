@@ -18,7 +18,7 @@ func main() {
 			cluster.Define("runtime", "runtime cluster").WithFallback("dataplane"),
 		)
 
-	opts := &flagutils.DefaultOptionSet{}
+	opts := flagutils.NewOptionSet()
 	opts.Add(mgmtDef)
 
 	flags := pflag.NewFlagSet("cli", pflag.ExitOnError)

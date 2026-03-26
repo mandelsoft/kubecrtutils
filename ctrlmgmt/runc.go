@@ -19,10 +19,7 @@ func Setup(name string, opts flagutils.OptionSet, def Definition, args ...string
 			return fmt.Errorf("options already contain a definition")
 		}
 	} else {
-		options := flagutils.DefaultOptionSet{}
-		options.Add(opts, def)
-		opts = options
-
+		opts = flagutils.NewOptionSet(opts, def)
 	}
 	if err := flagutils.Prepare(ctx, opts, nil); err != nil {
 		return err

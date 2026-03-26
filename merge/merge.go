@@ -4,13 +4,14 @@ import (
 	"bytes"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	// "k8s.io/apimachinery/pkg/util/managedfields"
 	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
-func (m *ObjectMerger) MergeObservingManagedFields(liveObj, desiredObj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+func (m *ObjectMerger) MergeObservingManagedFields(liveObj, desiredObj client.Object) (*unstructured.Unstructured, error) {
 	gvk, err := apiutil.GVKForObject(liveObj, m.scheme)
 	if err != nil {
 		return nil, err

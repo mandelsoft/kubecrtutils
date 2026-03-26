@@ -41,6 +41,23 @@ func (f *filter) Use(name string) bool {
 	return f.list.Has(name)
 }
 
+func (f *filter) Filter(opts flagutils.OptionSet) flagutils.OptionSet {
+	if f.list == nil {
+		return opts
+	}
+	filtered := flagutils.NewOptionSet()
+	for o := range opts.Options {
+		if d, ok := o.(Definition); ok {
+			if f.Use((d.GetName())) {
+				filtered.Add(o)
+			}
+		} else {
+			filtered.Add(o)
+		}
+	}
+	return filtered
+}
+
 type _definitions struct {
 	internal.DefinitionsImpl[Definition, Definitions]
 	groups      map[string][]string
@@ -51,7 +68,7 @@ type _definitions struct {
 var _ Definitions = (*_definitions)(nil)
 
 func NewDefinitions() Definitions {
-	d := &_definitions{constraints: constraints.New()}
+	d := &_definitions{constraints: constraints.New(), groups: make(map[string][]string)}
 	d.DefinitionsImpl = internal.NewDefinitions[Definition, Definitions]("index", d)
 	return d
 }
@@ -62,7 +79,7 @@ func (d *_definitions) Validate(ctx context.Context, opts flagutils.OptionSet, v
 	if err != nil {
 		return err
 	}
-	if copts == nil {
+	if copts != nil {
 		d.filter.list = copts.GetActivation()
 	}
 	return v.ValidateSet(ctx, opts, d.AsOptionSet()) // forward validation
@@ -94,10 +111,12 @@ func (d *_definitions) AddFlags(fs *pflag.FlagSet) {
 	d.DefinitionsImpl.AddFlags(fs)
 }
 
-func (d *_definitions) GetUsedClusters() ClusterNames {
+func (d *_definitions) GetUsedClusters(selection ControllerNames) cluster.ClusterNames {
 	names := set.New[string]()
-	for _, c := range d.Elements {
-		names.AddAll(c.GetRequiredClusters(nil))
+	for n, c := range d.Elements {
+		if selection.Contains(n) {
+			names.AddAll(c.GetRequiredClusters(nil))
+		}
 	}
 	return names
 }
@@ -169,4 +188,11 @@ func (d *_definitions) Apply(ctx context.Context, mgr types.ControllerManager) (
 		}
 	}
 	return controllers, nil
+}
+
+func (d *_definitions) AsOptionSet() flagutils.OptionSet {
+	if d.filter.list == nil {
+		return d.DefinitionsImpl.AsOptionSet()
+	}
+	return d.filter.Filter(d.DefinitionsImpl.AsOptionSet())
 }

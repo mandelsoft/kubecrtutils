@@ -51,8 +51,7 @@ func New(main string, electionId string, configs ...ConfigurationProvider) *Opti
 	if main == "" {
 		main = cluster.DEFAULT
 	}
-	nested := flagutils.DefaultOptionSet{}
-	nested = append(nested, tlsopts.New())
+	nested := flagutils.NewOptionSet(tlsopts.New())
 	return &Options{Nested: nested, defaultElectionId: electionId, Configurations: configs, main: main}
 }
 
