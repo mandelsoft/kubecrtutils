@@ -17,12 +17,12 @@ type None struct{}
 
 func (n None) AddFlags(fs *pflag.FlagSet) {}
 
-type SettingsFactory[O flagutils.Options, S any, P kubecrtutils.ObjectPointer[T], T any] func(ctx context.Context, o O, controller controller.TypedController[P, T]) S
+type SettingsFactory[O flagutils.Options, S any, P kubecrtutils.ObjectPointer[T], T any] func(ctx context.Context, o O, controller controller.TypedController[P, T]) (S, error)
 type RequestFactory[O flagutils.Options, S any, P kubecrtutils.ObjectPointer[T], T any] func(*reconciler.BaseRequest[P], *Reconciler[O, S, P, T]) reconciler.ReconcileRequest[P]
 
 type Factory[O flagutils.Options, S any, P kubecrtutils.ObjectPointer[T], T any] interface {
 	CreateOptions() O
-	CreateSettings(ctx context.Context, o O, controller controller.TypedController[P, T]) S
+	CreateSettings(ctx context.Context, o O, controller controller.TypedController[P, T]) (S, error)
 	CreateRequest(*reconciler.BaseRequest[P], *Reconciler[O, S, P, T]) reconciler.ReconcileRequest[P]
 }
 
@@ -44,9 +44,14 @@ func NewByFactory[O flagutils.Options, S any, P kubecrtutils.ObjectPointer[T], T
 }
 
 func (f *ReconcilerFactory[O, S, P, T]) CreateReconciler(ctx context.Context, controller controller.TypedController[P, T], b builder.Builder) (crtreconcile.Reconciler, error) {
+	var err error
 	var set S
+
 	if f.attrfactory != nil {
-		set = f.attrfactory(ctx, f.Options, controller)
+		set, err = f.attrfactory(ctx, f.Options, controller)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	gvks, _, err := controller.GetCluster().GetScheme().ObjectKinds(controller.GetResource())

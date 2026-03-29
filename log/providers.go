@@ -31,7 +31,7 @@ func (c clusterinfo) Message() string {
 
 func ClusterInfoMsg(base ...string) string {
 	b := general.Optional(base...)
-	return fmt.Sprintf("{{clusterkind%s}} {{cluster%s}}[{{clusterid%s}}] accessing {{clusterinfo%s}}", b, b, b, b, b)
+	return fmt.Sprintf("{{clusterkind%s}} {{cluster%s}}[{{clusterid%s}}] accessing {{clusterinfo%s}}", b, b, b, b)
 }
 
 ////////////////////////////////////////////////////////////////////////////////

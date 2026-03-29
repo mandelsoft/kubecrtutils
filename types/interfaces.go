@@ -60,6 +60,8 @@ type ControllerDefinition interface {
 	GetWatchPredicates() []predicate.Predicate
 	GetFinalizer() string
 
+	GetForeignIndices() IndexDefinitions
+
 	GetRequiredClusters(mappings ControllerMappings) ClusterNames
 	GetError() error
 	GetOptions() flagutils.Options
@@ -130,6 +132,7 @@ type Clusters interface {
 	internal.Group[ClusterEquivalent]
 	IsMulti() bool
 	GetClusterById(clusterId string) ClusterEquivalent
+	IsDisabled(name string) bool
 }
 
 type Index interface {
@@ -148,6 +151,22 @@ type Index interface {
 
 type Indices interface {
 	internal.Group[Index]
+}
+
+type IndexerFactory = ClustersAware[client.IndexerFunc]
+
+type IndexDefinition interface {
+	GetName() string
+	GetTarget() string
+	GetResource() client.Object
+	GetIndexer() IndexerFactory
+	Apply(ctx context.Context, set Clusters, logger logging.Logger) (Index, error)
+}
+
+type IndexDefinitions interface {
+	internal.Definitions[IndexDefinition, IndexDefinitions]
+
+	GetIndices(ctx context.Context, clusters Clusters, logger logging.Logger) (Indices, error)
 }
 
 type ClusterDefinitionProvider interface {

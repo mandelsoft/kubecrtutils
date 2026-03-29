@@ -27,7 +27,7 @@ type definitions struct {
 	internal.DefinitionsImpl[Definition, Definitions]
 	scheme   *runtime.Scheme
 	main     Definition
-	clusters Clusters
+	clusters *clusters
 }
 
 var _ Definitions = (*definitions)(nil)
@@ -75,12 +75,14 @@ func (d *definitions) Validate(ctx context.Context, opts flagutils.OptionSet, v 
 		required.Add(d.GetNames()...)
 	}
 
+	intermediate := ClusterNames{}
+
 	if d.clusters == nil && d.GetError() == nil {
 		err := v.ValidateSet(ctx, opts, &d.DefinitionsImpl)
 		if err != nil {
 			return d.AddError(err, "validation")
 		}
-		d.clusters = NewClusters()
+		d.clusters = newClusters()
 
 		missing := true
 		found := true
@@ -88,7 +90,7 @@ func (d *definitions) Validate(ctx context.Context, opts flagutils.OptionSet, v 
 			missing = false
 			found = false
 			for n, def := range d.Elements {
-				if d.clusters.Get(n) != nil || !required.Contains(n) {
+				if d.clusters.Get(n) != nil || !(required.Contains(n) || intermediate.Contains(n)) {
 					continue
 				}
 
@@ -109,13 +111,13 @@ func (d *definitions) Validate(ctx context.Context, opts flagutils.OptionSet, v 
 				}
 				eff := d.clusters.Get(fb)
 				if eff != nil {
-					if !def.AcceptFleet() && eff.AsFleet() != nil {
-						return fmt.Errorf("fallback %q for cluster %q is fleet", def.GetName(), fb)
+					if !def.AcceptFleet() && eff.AsFleet() != nil && required.Contains(def.GetName()) {
+						return fmt.Errorf("fallback %q for cluster %q is fleet", fb, def.GetName())
 					}
 					d.clusters.Add(NewAlias(n, eff))
 					found = true
 				} else {
-					required.Add(fb)
+					intermediate.Add(fb)
 					if fb == DEFAULT {
 						err := v.Validate(ctx, opts, d.main)
 						if err != nil {
@@ -141,6 +143,12 @@ func (d *definitions) Validate(ctx context.Context, opts flagutils.OptionSet, v 
 				if d.clusters.Get(n) == nil {
 					return d.AddError(fmt.Errorf("kubeconfig required"), "cluster ", n)
 				}
+			}
+		}
+
+		for n := range d.Elements {
+			if d.clusters.Get(n) == nil {
+				d.clusters.disabled.Add(n)
 			}
 		}
 	}

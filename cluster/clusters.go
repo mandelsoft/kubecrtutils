@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"github.com/mandelsoft/goutils/set"
 	"github.com/mandelsoft/kubecrtutils/cluster/fleet/fpi"
 	"github.com/mandelsoft/kubecrtutils/internal"
 )
@@ -9,13 +10,18 @@ import (
 
 type clusters struct {
 	internal.Group[ClusterEquivalent]
-	multi bool
+	multi    bool
+	disabled set.Set[string]
 }
 
 var _ Clusters = (*clusters)(nil)
 
 func NewClusters() Clusters {
-	return &clusters{Group: internal.NewGroup[ClusterEquivalent]("cluster")}
+	return newClusters()
+}
+
+func newClusters() *clusters {
+	return &clusters{Group: internal.NewGroup[ClusterEquivalent]("cluster"), disabled: set.New[string]()}
 }
 
 func (c *clusters) Get(name string) ClusterEquivalent {
@@ -31,6 +37,10 @@ func (c *clusters) Get(name string) ClusterEquivalent {
 		return nil
 	}
 	return f.AsFleet().GetClusterByLocalName(n)
+}
+
+func (c *clusters) IsDisabled(name string) bool {
+	return c.disabled.Has(name)
 }
 
 func (c *clusters) GetClusterById(id string) ClusterEquivalent {

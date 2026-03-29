@@ -54,6 +54,7 @@ type TypedDefinition[P kubecrtutils.ObjectPointer[T], T any] interface {
 	WithActivationConstraint(...constraints.Constraint) TypedDefinition[P, T]
 	InGroup(...string) TypedDefinition[P, T]
 
+	AddForeignIndex(i ...cacheindex.Definition) *_definition[P, T]
 	AddIndex(name string, indexerFunc cacheindex.IndexerFunc[P]) TypedDefinition[P, T]
 	ImportIndex(reference cacheindex.Reference) TypedDefinition[P, T]
 	AddTrigger(trigger ...ResourceTriggerDefinition) TypedDefinition[P, T]
@@ -74,6 +75,8 @@ type _definition[P kubecrtutils.ObjectPointer[T], T any] struct {
 	constraints constraints.Constraints
 	groups      set.Set[string]
 	finalizer   string
+
+	foreign cacheindex.Definitions
 }
 
 func DefineByFunc[P kubecrtutils.ObjectPointer[T], T any](name string, cluster string, fac ReconcilerFactoryFunc[P, T]) TypedDefinition[P, T] {
@@ -92,6 +95,7 @@ func Define[P kubecrtutils.ObjectPointer[T], T any](name string, cluster string,
 		imports:        map[string]cacheindex.Definition{},
 		groups:         set.New[string](),
 		constraints:    constraints.New(),
+		foreign:        cacheindex.NewDefinitions(),
 	}
 	return d
 }
@@ -118,6 +122,11 @@ func (d *_definition[P, T]) UseCluster(name ...string) TypedDefinition[P, T] {
 
 func (d *_definition[P, T]) WithActivationConstraint(constraints ...constraints.Constraint) TypedDefinition[P, T] {
 	d.constraints.Add(constraints...)
+	return d
+}
+
+func (d *_definition[P, T]) AddForeignIndex(i ...cacheindex.Definition) *_definition[P, T] {
+	d.foreign.Add(i...)
 	return d
 }
 
@@ -172,6 +181,11 @@ func (d *_definition[P, T]) AsOptionSet() flagutils.OptionSet {
 func (d *_definition[P, T]) Validate(ctx context.Context, opts flagutils.OptionSet, v flagutils.ValidationSet) error {
 	if o, ok := d.reconciler.(flagutils.Validatable); ok {
 		return o.Validate(ctx, opts, v)
+	}
+	for _, i := range d.foreign.Elements {
+		if !d.clusters.Contains(i.GetTarget()) {
+			return fmt.Errorf("foreign index %q usines undeclared cluster %q", i.GetName(), i.GetTarget())
+		}
 	}
 	return v.ValidateSet(ctx, opts, d.AsOptionSet())
 }
@@ -231,6 +245,10 @@ func (d *_definition[P, T]) GetTriggers() []ResourceTriggerDefinition {
 	return slices.Clone(d.triggers)
 }
 
+func (d *_definition[P, T]) GetForeignIndices() cacheindex.Definitions {
+	return d.foreign
+}
+
 func (d *_definition[P, T]) CreateIndices(ctx context.Context, mapping types.ControllerMappings, mgr types.ControllerManager) error {
 	mapping = types.DefaultMappings(mapping)
 	clusters, err := cluster.Map(mgr.GetClusters(), mapping.ClusterMappings(), d.GetClusters())
@@ -247,6 +265,20 @@ func (d *_definition[P, T]) CreateIndices(ctx context.Context, mapping types.Con
 			return fmt.Errorf("index %q[%s]: %w", n, g, err)
 		}
 		logger.Info("  exporting index {{index}}[{{global}}}", "index", n, "global", g)
+		err = mgr.GetIndices().Add(cacheindex.NewIndexAlias(g, idx))
+		if err != nil {
+			return fmt.Errorf("global index %q[%s]: %w", n, g, err)
+		}
+	}
+
+	for n, i := range d.foreign.Elements {
+		g := idxmap.Map(n)
+		logger.Info("- configuring foreign index {{index}}[{{global}}] from controller {{controller}}", "index", n, "global", g, "controller", d.GetName())
+		idx, err := i.Apply(ctx, clusters, logger)
+		if err != nil {
+			return fmt.Errorf("index %q[%s]: %w", n, g, err)
+		}
+		logger.Info("  exporting foreign index {{index}}[{{global}}}", "index", n, "global", g)
 		err = mgr.GetIndices().Add(cacheindex.NewIndexAlias(g, idx))
 		if err != nil {
 			return fmt.Errorf("global index %q[%s]: %w", n, g, err)
@@ -314,6 +346,12 @@ func (d *_definition[P, T]) CreateController(ctx context.Context, mapping types.
 			return nil, err
 		}
 		all[n] = idx
+	}
+	for _, i := range d.foreign.Elements {
+		_, err := registerIndex(logger, i, clusters, idxmap, mgr, all)
+		if err != nil {
+			return nil, err
+		}
 	}
 	for _, i := range d.imports {
 		_, err := registerIndex(logger, i, clusters, idxmap, mgr, all)

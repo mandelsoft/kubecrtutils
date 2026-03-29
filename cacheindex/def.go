@@ -14,15 +14,9 @@ import (
 
 type IndexerFunc[T client.Object] = types.IndexerFunc[T]
 
-type IndexerFactory = types.ClustersAware[client.IndexerFunc]
+type IndexerFactory = types.IndexerFactory
 
-type Definition interface {
-	GetName() string
-	GetTarget() string
-	GetResource() client.Object
-	GetIndexer() IndexerFactory
-	Apply(ctx context.Context, set Clusters, logger logging.Logger) (types.Index, error)
-}
+type Definition = types.IndexDefinition
 
 type Reference interface {
 	Definition
