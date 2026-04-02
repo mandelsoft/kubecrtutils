@@ -9,6 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+// Reconciler includes the options and setting field.
 type Reconciler[O flagutils.Options, S any, P kubecrtutils.ObjectPointer[T], T any] struct {
 	logging.Logger
 	Controller   controller.TypedController[P, T]

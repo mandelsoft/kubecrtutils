@@ -33,6 +33,10 @@ import (
 
 type recorderFunc func(ctx context.Context) record.EventRecorder
 
+type FinalizerModifier interface {
+	ModifyFinalizer(s string) string
+}
+
 type _controller[P kubecrtutils.ObjectPointer[T], T any] struct {
 	enforceNameExtension bool
 	controllerManager    types.ControllerManager
@@ -47,6 +51,7 @@ type _controller[P kubecrtutils.ObjectPointer[T], T any] struct {
 	allIndices           map[string]cacheindex.Index
 	reconciler           reconcile.Reconciler
 	ohandler             owner.Handler
+	finalizer            string
 }
 
 func (c *_controller[P, T]) GetName() string {
@@ -66,7 +71,7 @@ func (c *_controller[P, T]) GetFieldManager() string {
 }
 
 func (c *_controller[P, T]) GetFinalizer() string {
-	return c.controllerManager.GetName() + "/" + c.definition.GetFinalizer()
+	return c.finalizer
 }
 
 func (c *_controller[P, T]) GetLogger() logging.Logger {

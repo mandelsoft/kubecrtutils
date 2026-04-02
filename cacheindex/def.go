@@ -52,6 +52,18 @@ func Ref[P kubecrtutils.ObjectPointer[T], T any](name string, target string) Ref
 	}}
 }
 
+func (r *_reference[P, T]) ApplyMappings(mappings types.ControllerMappings) Definition {
+	if mappings == nil || mappings.IsNone() {
+		return r
+	}
+	return &_reference[P, T]{_definition[P, T]{
+		Element:        internal.NewElement(mappings.IndexMappings().Map(r.GetName())),
+		target:         mappings.ClusterMappings().Map(r.target),
+		indexerFactory: r.indexerFactory,
+		proto:          r.proto,
+	}}
+}
+
 func Define[P kubecrtutils.ObjectPointer[T], T any](name string, target string, idxfunc IndexerFunc[P]) TypedDefinition[P, T] {
 	return &_definition[P, T]{
 		Element:        internal.NewElement(name),
@@ -59,6 +71,22 @@ func Define[P kubecrtutils.ObjectPointer[T], T any](name string, target string, 
 		indexerFactory: Lift(ConvertIndexerFunc(idxfunc)),
 		proto:          generics.ObjectFor[P](),
 	}
+}
+
+func (d *_definition[P, T]) ApplyMappings(mappings types.ControllerMappings) Definition {
+	if mappings == nil || mappings.IsNone() {
+		return d
+	}
+	return &_definition[P, T]{
+		Element:        internal.NewElement(mappings.IndexMappings().Map(d.GetName())),
+		target:         mappings.ClusterMappings().Map(d.target),
+		indexerFactory: d.indexerFactory,
+		proto:          d.proto,
+	}
+}
+
+func (d *_definition[P, T]) GetEffective() Definition {
+	return d
 }
 
 func (d *_definition[P, T]) GetTarget() string {

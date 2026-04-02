@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/mandelsoft/flagutils"
+	"github.com/mandelsoft/goutils/generics"
+	"github.com/mandelsoft/goutils/reflectutils"
 	"github.com/mandelsoft/kubecrtutils"
 	"github.com/mandelsoft/kubecrtutils/controller"
 	"github.com/mandelsoft/kubecrtutils/controller/builder"
@@ -28,6 +30,9 @@ type Factory[O flagutils.Options, S any, P kubecrtutils.ObjectPointer[T], T any]
 
 ////////////////////////////////////////////////////////////////////////////////
 
+// ReconcilerFactory creates a controller.Reconciler for given options and settings type.
+// The options can implement ModifyFinalizer to influence the
+// generated finalizer name.
 type ReconcilerFactory[O flagutils.Options, S any, P kubecrtutils.ObjectPointer[T], T any] struct {
 	reqfactory  RequestFactory[O, S, P, T]
 	attrfactory SettingsFactory[O, S, P, T]
@@ -41,6 +46,14 @@ func New[O flagutils.Options, S any, P kubecrtutils.ObjectPointer[T], T any](o f
 
 func NewByFactory[O flagutils.Options, S any, P kubecrtutils.ObjectPointer[T], T any](fac Factory[O, S, P, T]) *ReconcilerFactory[O, S, P, T] {
 	return New[O, S, P, T](fac.CreateOptions, fac.CreateSettings, fac.CreateRequest)
+}
+
+func (r *ReconcilerFactory[O, S, P, T]) ModifyFinalizer(f string) string {
+	reflectutils.CallOptionalInterfaceMethodOn[controller.FinalizerModifier](r.Options, f)
+	if m, ok := generics.TryCast[controller.FinalizerModifier](r.Options); ok {
+		return m.ModifyFinalizer(f)
+	}
+	return f
 }
 
 func (f *ReconcilerFactory[O, S, P, T]) CreateReconciler(ctx context.Context, controller controller.TypedController[P, T], b builder.Builder) (crtreconcile.Reconciler, error) {
@@ -72,6 +85,6 @@ func (f *ReconcilerFactory[O, S, P, T]) CreateReconciler(ctx context.Context, co
 		Settings: set,
 		request:  f.reqfactory,
 	}
-	r.Info("using {{ctype}} {{cluster}}[{{info}}]", "ctype", controller.GetCluster().GetTypeInfo(), "name", controller.GetCluster().GetName(), "info", controller.GetCluster().GetInfo())
+	r.Info("using main {{ctype}} {{cluster}}[{{info}}]", "ctype", controller.GetCluster().GetTypeInfo(), "cluster", controller.GetCluster().GetName(), "info", controller.GetCluster().GetInfo())
 	return reconciler.CRTReconcilerFor[P](controller, r, 0), nil
 }

@@ -10,15 +10,14 @@ import (
 	"github.com/mandelsoft/goutils/maputils"
 	"github.com/mandelsoft/goutils/set"
 	"github.com/mandelsoft/goutils/sliceutils"
+	"github.com/mandelsoft/kubecrtutils/controller/constraints"
+	"github.com/mandelsoft/kubecrtutils/types"
 	"github.com/spf13/pflag"
 )
 
 const ALL = "all"
 
-type ControllerSet interface {
-	GetNames() []string
-	GetGroups() map[string][]string
-}
+type ControllerSet = constraints.ControllerSet
 
 type ControllerSource interface {
 	GetControllerSet() ControllerSet
@@ -112,9 +111,13 @@ func (o *Options) handle(h func(name ...string) set.Set[string], name string, ha
 	handled.Delete(name)
 }
 
-func (o *Options) GetActivation() set.Set[string] {
+func (o *Options) GetContraintContext() *constraints.Context {
+	return constraints.NewContext(o.set).WithSelectedSet(o.GetActivation())
+}
+
+func (o *Options) GetActivation() types.ControllerNames {
 	simplified := Simplify(o.names)
-	handled := set.New[string]()
+	handled := types.ControllerNames{}
 	names := set.New[string]()
 	for i, name := range o.activated {
 		if strings.HasPrefix(name, "-") {

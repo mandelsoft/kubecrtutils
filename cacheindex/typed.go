@@ -4,10 +4,19 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/mandelsoft/kubecrtutils/internal"
 	"github.com/mandelsoft/kubecrtutils/types"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+type TypedIndices[T any] interface {
+	internal.Group[TypedIndex[T]]
+}
+
+func NewTypedIndices[T any](name string) TypedIndices[T] {
+	return internal.NewGroup[TypedIndex[T]](name)
+}
 
 type TypedIndex[T any] interface {
 	types.Index

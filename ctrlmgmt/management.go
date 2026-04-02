@@ -6,7 +6,9 @@ import (
 	"slices"
 	"sort"
 
+	"github.com/mandelsoft/kubecrtutils/component"
 	. "github.com/mandelsoft/kubecrtutils/log"
+	"sigs.k8s.io/multicluster-runtime/pkg/manager"
 
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/kubecrtutils"
@@ -75,7 +77,7 @@ func NewControllerManagerByOpts(ctx context.Context, opts flagutils.OptionSetPro
 		}
 	}
 
-	manager, err := mopts.GetManager(ctx, opts)
+	mcmgr, err := mopts.GetManager(ctx, opts)
 	if err != nil {
 		return nil, fmt.Errorf("settingup manager: %w", err)
 	}
@@ -101,10 +103,47 @@ func NewControllerManagerByOpts(ctx context.Context, opts flagutils.OptionSetPro
 		Element:    internal.NewElement(def.GetName()),
 		logger:     logger,
 		clusters:   clusters,
-		manager:    manager,
+		manager:    mcmgr,
 		main:       main.AsCluster(),
 		indices:    indices,
 		definition: def,
+	}
+
+	coopts := component.From(opts)
+	if coopts != nil && coopts.Len() > 0 {
+		logger.Info("configure component indices...")
+		err = coopts.CreateIndices(ctx, cm)
+		if err != nil {
+			return nil, fmt.Errorf("setting up component indices: %w", err)
+		}
+	}
+
+	if cntropts != nil && cntropts.Len() > 0 {
+		logger.Info("configure controller indices...")
+		err = cntropts.CreateIndices(ctx, cm)
+		if err != nil {
+			return nil, fmt.Errorf("setting up controller indices: %w", err)
+		}
+	}
+
+	if coopts != nil && coopts.Len() > 0 {
+		logger.Info("configure components...")
+		cm.components, err = coopts.Apply(ctx, cm)
+		if err != nil {
+			return nil, fmt.Errorf("setting up components: %w", err)
+		}
+
+		for _, c := range cm.components.Elements {
+			if r, ok := c.(manager.Runnable); ok {
+				logger.Info("registering component {{comp}} at manager", "comp", c.GetName())
+				err := mcmgr.Add(r)
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+	} else {
+		cm.components = component.NewComponents()
 	}
 
 	cntr, err := cntropts.Apply(ctx, cm)
@@ -123,6 +162,7 @@ type _controllermanager struct {
 	clusters    cluster.Clusters
 	indices     cacheindex.Indices
 	controllers controller.Controllers
+	components  component.Components
 	definition  Definition
 }
 
@@ -156,4 +196,8 @@ func (cm *_controllermanager) MapTechnicalName(name string) cluster.ClusterEquiv
 
 func (cm *_controllermanager) GetIndex(name string) cluster.Index {
 	return cm.indices.Get(name)
+}
+
+func (cm *_controllermanager) GetComponent(name string) component.Component {
+	return cm.components.Get(name)
 }

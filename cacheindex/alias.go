@@ -1,5 +1,25 @@
 package cacheindex
 
+type definitionAlias struct {
+	Definition
+	name string
+}
+
+func NewDefinitionAlias(name string, idx Definition) Definition {
+	if name == idx.GetName() {
+		return idx
+	}
+	return &definitionAlias{idx, name}
+}
+
+func (i *definitionAlias) GetEffective() Definition {
+	return i.Definition.GetEffective()
+}
+
+func (i *definitionAlias) GetName() string {
+	return i.name
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 
 type indexAlias struct {
@@ -7,7 +27,7 @@ type indexAlias struct {
 	name string
 }
 
-func NewIndexAlias(name string, idx Index) Index {
+func NewAlias(name string, idx Index) Index {
 	if name == idx.GetName() {
 		return idx
 	}

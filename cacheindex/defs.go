@@ -44,3 +44,11 @@ func (d *_definitions) GetIndices(ctx context.Context, clusters Clusters, logger
 	}
 	return indices, nil
 }
+
+func (d *_definitions) ApplyMappings(mappings types.ControllerMappings) Definitions {
+	defs := NewDefinitions()
+	for _, e := range d.Elements {
+		defs.Add(e.ApplyMappings(mappings))
+	}
+	return defs
+}

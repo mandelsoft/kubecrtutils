@@ -42,6 +42,10 @@ func IdentityMapping(set sets.Set[string]) Mappings {
 type ControllerMappings interface {
 	ClusterMappings() Mappings
 	IndexMappings() Mappings
+
+	IsNone() bool
+	IsClustersNone() bool
+	IsIndicesNone() bool
 }
 
 func DefaultMappings(mappings ControllerMappings) ControllerMappings {
@@ -63,4 +67,16 @@ func (n none) ClusterMappings() Mappings {
 
 func (n none) IndexMappings() Mappings {
 	return nil
+}
+
+func (n none) IsNone() bool {
+	return true
+}
+
+func (n none) IsClustersNone() bool {
+	return true
+}
+
+func (n none) IsIndicesNone() bool {
+	return true
 }

@@ -15,15 +15,15 @@ func Complete(grps ...string) Constraint {
 	return &_complete{groups: grps}
 }
 
-func (r *_complete) Match(ctx *Context, cur ControllerNames) error {
+func (r *_complete) Match(ctx *Context) (Activation, error) {
 	for _, group := range r.groups {
 		g := ctx.GetGroup(group)
 		if g == nil {
-			return fmt.Errorf("group %q used but not declared", group)
+			return NoOpinion, fmt.Errorf("group %q used but not declared", group)
 		}
-		if len(g) != len(g.Intersection(cur)) {
-			return fmt.Errorf("group %q must be complete [%s]", group, strings.Join(maputils.OrderedKeys(g), ", "))
+		if len(g) != len(g.Intersection(ctx.Selected())) {
+			return NoOpinion, fmt.Errorf("group %q must be complete [%s]", group, strings.Join(maputils.OrderedKeys(g), ", "))
 		}
 	}
-	return nil
+	return NoOpinion, nil
 }

@@ -5,6 +5,7 @@ import (
 
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/goutils/general"
+	"github.com/mandelsoft/goutils/reflectutils"
 	"github.com/spf13/pflag"
 )
 
@@ -38,9 +39,7 @@ func NewRules(r ...Rule) Rules {
 
 func (r *_rules) RequireIdentity() {
 	for _, e := range r.rules {
-		if i, ok := e.(IdentityProvider); ok {
-			i.RequireIdentity()
-		}
+		reflectutils.CallOptionalInterfaceMethodOn[IdentityProvider](e)
 	}
 }
 
@@ -89,9 +88,7 @@ func (r *_rules) AsOptionSet() flagutils.OptionSet {
 
 func (r *_rules) AddFlags(fs *pflag.FlagSet) {
 	for _, e := range r.rules {
-		if o, ok := e.(flagutils.Options); ok {
-			o.AddFlags(fs)
-		}
+		reflectutils.CallOptionalInterfaceMethodOn[flagutils.Options](e, fs)
 	}
 }
 

@@ -24,6 +24,10 @@ import (
 	mcreconcile "sigs.k8s.io/multicluster-runtime/pkg/reconcile"
 )
 
+type DefinitionProvider[D any] interface {
+	GetDefinition() D
+}
+
 type IndexerFunc[T client.Object] = func(T) []string
 
 type ObjectMapper[T any, R any] = func(ctx context.Context, obj T) []R
@@ -47,14 +51,17 @@ type ControllerManager interface {
 }
 
 type ClusterNames = set.Set[string]
+type ComponentNames = set.Set[string]
 
 type ControllerDefinition interface {
 	flagutils.Options
+
 	GetName() string
 
 	GetActivationConstraints() constraints.Constraints
 	GetCluster() string
 	GetClusters() ClusterNames
+	GetComponents() ComponentNames
 	GetResource() client.Object
 	GetGroups() set.Set[string]
 	GetWatchPredicates() []predicate.Predicate
@@ -160,11 +167,14 @@ type IndexDefinition interface {
 	GetTarget() string
 	GetResource() client.Object
 	GetIndexer() IndexerFactory
+	GetEffective() IndexDefinition
+	ApplyMappings(mappings ControllerMappings) IndexDefinition
 	Apply(ctx context.Context, set Clusters, logger logging.Logger) (Index, error)
 }
 
 type IndexDefinitions interface {
 	internal.Definitions[IndexDefinition, IndexDefinitions]
+	ApplyMappings(mappings ControllerMappings) IndexDefinitions
 
 	GetIndices(ctx context.Context, clusters Clusters, logger logging.Logger) (Indices, error)
 }

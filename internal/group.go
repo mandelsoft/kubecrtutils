@@ -25,6 +25,9 @@ func NewErrorContainer(name string) *ErrorContainer {
 func (c *ErrorContainer) AddError(a any, ctx ...any) error {
 	defer c.lock.Lock()()
 
+	if a == nil {
+		return nil
+	}
 	var err error
 	switch v := a.(type) {
 	case error:

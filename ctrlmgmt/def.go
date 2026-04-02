@@ -6,6 +6,7 @@ import (
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/kubecrtutils/cacheindex"
 	"github.com/mandelsoft/kubecrtutils/cluster"
+	"github.com/mandelsoft/kubecrtutils/component"
 	"github.com/mandelsoft/kubecrtutils/controller"
 	"github.com/mandelsoft/kubecrtutils/controller/constraints"
 	"github.com/mandelsoft/kubecrtutils/internal"
@@ -39,8 +40,9 @@ type definition struct {
 	internal.Element
 	options     flagutils.DefaultOptionSet
 	clusters    cluster.Definitions
-	controllers controller.Definitions
 	indices     cacheindex.Definitions
+	components  component.Definitions
+	controllers controller.Definitions
 }
 
 func Define(name, main string) Definition {
@@ -48,9 +50,10 @@ func Define(name, main string) Definition {
 		Element:     internal.NewElement(name),
 		clusters:    cluster.NewDefinitions(),
 		indices:     cacheindex.NewDefinitions(),
+		components:  component.NewDefinitions(),
 		controllers: controller.NewDefinitions(),
 	}
-	d.options.Add(d.clusters, d.indices, d.controllers, manageropts.New(main, name))
+	d.options.Add(d.clusters, d.indices, d.controllers, d.components, manageropts.New(main, name))
 	return d
 }
 
@@ -68,6 +71,7 @@ func (d *definition) AddController(def ...controller.Definition) Definition {
 	d.controllers.Add(def...)
 	return d
 }
+
 func (d *definition) AddControllerRule(rules ...constraints.Constraint) Definition {
 	d.controllers.AddRule(rules...)
 	return d

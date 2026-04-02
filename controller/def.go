@@ -14,6 +14,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/cacheindex"
 	"github.com/mandelsoft/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubecrtutils/cluster/clustercontext"
+	"github.com/mandelsoft/kubecrtutils/component"
 	"github.com/mandelsoft/kubecrtutils/controller/builder"
 	"github.com/mandelsoft/kubecrtutils/controller/constraints"
 	"github.com/mandelsoft/kubecrtutils/internal"
@@ -27,6 +28,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
+// ReconcilerFactory is responsible to create a reconciler for the
+// given object type.
+// Optionally it might implement ModifyFinalizer to influence the finalizer
+// name generation.
 type ReconcilerFactory[P kubecrtutils.ObjectPointer[T], T any] interface {
 	CreateReconciler(ctx context.Context, controller TypedController[P, T], b builder.Builder) (reconcile.Reconciler, error)
 }
@@ -47,14 +52,14 @@ type TypedDefinition[P kubecrtutils.ObjectPointer[T], T any] interface {
 	GetReconciler() ReconcilerFactory[P, T]
 	GetTriggers() []ResourceTriggerDefinition
 
-	WithFinalizer(string) *_definition[P, T]
-	WithPredicates(preds ...predicate.Predicate) *_definition[P, T]
+	WithFinalizer(string) TypedDefinition[P, T]
+	WithPredicates(preds ...predicate.Predicate) TypedDefinition[P, T]
 	// WithActivationConstraint declares additional activation rules
 	// relevant if this controller is activated.
 	WithActivationConstraint(...constraints.Constraint) TypedDefinition[P, T]
 	InGroup(...string) TypedDefinition[P, T]
 
-	AddForeignIndex(i ...cacheindex.Definition) *_definition[P, T]
+	AddForeignIndex(i ...cacheindex.Definition) TypedDefinition[P, T]
 	AddIndex(name string, indexerFunc cacheindex.IndexerFunc[P]) TypedDefinition[P, T]
 	ImportIndex(reference cacheindex.Reference) TypedDefinition[P, T]
 	AddTrigger(trigger ...ResourceTriggerDefinition) TypedDefinition[P, T]
@@ -67,6 +72,7 @@ type _definition[P kubecrtutils.ObjectPointer[T], T any] struct {
 	predicates  []predicate.Predicate
 	cluster     string
 	clusters    ClusterNames
+	components  component.ComponentNames
 	proto       client.Object
 	reconciler  ReconcilerFactory[P, T]
 	indices     map[string]cacheindex.TypedDefinition[P, T]
@@ -105,12 +111,12 @@ func (d *_definition[P, T]) InGroup(group ...string) TypedDefinition[P, T] {
 	return d
 }
 
-func (d *_definition[P, T]) WithPredicates(preds ...predicate.Predicate) *_definition[P, T] {
+func (d *_definition[P, T]) WithPredicates(preds ...predicate.Predicate) TypedDefinition[P, T] {
 	d.predicates = append(d.predicates, preds...)
 	return d
 }
 
-func (d *_definition[P, T]) WithFinalizer(s string) *_definition[P, T] {
+func (d *_definition[P, T]) WithFinalizer(s string) TypedDefinition[P, T] {
 	d.finalizer = s
 	return d
 }
@@ -120,18 +126,30 @@ func (d *_definition[P, T]) UseCluster(name ...string) TypedDefinition[P, T] {
 	return d
 }
 
+func (d *_definition[P, T]) UseComponent(name ...string) TypedDefinition[P, T] {
+	d.components.Add(name...)
+	return d
+}
+
 func (d *_definition[P, T]) WithActivationConstraint(constraints ...constraints.Constraint) TypedDefinition[P, T] {
 	d.constraints.Add(constraints...)
 	return d
 }
 
-func (d *_definition[P, T]) AddForeignIndex(i ...cacheindex.Definition) *_definition[P, T] {
-	d.foreign.Add(i...)
+func (d *_definition[P, T]) AddForeignIndex(indices ...cacheindex.Definition) TypedDefinition[P, T] {
+	for _, i := range indices {
+		name := i.GetName()
+		if d.indices[name] != nil || d.imports[name] != nil || d.foreign.Get(i.GetName()) != nil {
+			d.AddError(fmt.Errorf("duplicate definition of index %q", name))
+		} else {
+			d.foreign.Add(i)
+		}
+	}
 	return d
 }
 
 func (d *_definition[P, T]) AddIndex(name string, indexerFunc cacheindex.IndexerFunc[P]) TypedDefinition[P, T] {
-	if d.indices[name] != nil || d.imports[name] != nil {
+	if d.indices[name] != nil || d.imports[name] != nil || d.foreign.Get(name) != nil {
 		d.AddError(fmt.Errorf("duplicate definition of index %q", name))
 	} else {
 		i := cacheindex.Define[P, T](name, d.cluster, indexerFunc)
@@ -143,8 +161,8 @@ func (d *_definition[P, T]) AddIndex(name string, indexerFunc cacheindex.Indexer
 }
 
 func (d *_definition[P, T]) ImportIndex(def cacheindex.Reference) TypedDefinition[P, T] {
-	if d.indices[def.GetName()] != nil || d.imports[def.GetName()] != nil {
-		d.AddError(fmt.Errorf("duplicate dedinition of index %q"))
+	if d.indices[def.GetName()] != nil || d.imports[def.GetName()] != nil || d.foreign.Get(def.GetName()) != nil {
+		d.AddError(fmt.Errorf("duplicate dedinition of index %q", def.GetName()))
 	} else {
 		d.AddError(def, "index ", def.GetName())
 		d.imports[def.GetName()] = def
@@ -161,6 +179,8 @@ func (d *_definition[P, T]) AddTrigger(trigger ...ResourceTriggerDefinition) Typ
 	}
 	return d
 }
+
+////////////////////////////////////////////////////////////////////////////////
 
 func (d *_definition[P, T]) AddFlags(fs *pflag.FlagSet) {
 	if o, ok := d.reconciler.(flagutils.Options); ok {
@@ -197,6 +217,8 @@ func (d *_definition[P, T]) Finalize(ctx context.Context, opts flagutils.OptionS
 	return v.FinalizeSet(ctx, opts, d.AsOptionSet())
 }
 
+////////////////////////////////////////////////////////////////////////////////
+
 func (d *_definition[P, T]) GetCluster() string {
 	return d.cluster
 }
@@ -206,6 +228,10 @@ func (d *_definition[P, T]) GetFinalizer() string {
 		return d.GetName()
 	}
 	return d.finalizer
+}
+
+func (d *_definition[P, T]) GetComponents() component.ComponentNames {
+	return maps.Clone(d.components)
 }
 
 func (d *_definition[P, T]) GetClusters() ClusterNames {
@@ -265,11 +291,14 @@ func (d *_definition[P, T]) CreateIndices(ctx context.Context, mapping types.Con
 			return fmt.Errorf("index %q[%s]: %w", n, g, err)
 		}
 		logger.Info("  exporting index {{index}}[{{global}}}", "index", n, "global", g)
-		err = mgr.GetIndices().Add(cacheindex.NewIndexAlias(g, idx))
+		err = mgr.GetIndices().Add(cacheindex.NewAlias(g, idx))
 		if err != nil {
 			return fmt.Errorf("global index %q[%s]: %w", n, g, err)
 		}
 	}
+
+	// hmm we could add the foreign indices directly to the global index defintions.
+	// and use here simple imports instead.
 
 	for n, i := range d.foreign.Elements {
 		g := idxmap.Map(n)
@@ -279,7 +308,7 @@ func (d *_definition[P, T]) CreateIndices(ctx context.Context, mapping types.Con
 			return fmt.Errorf("index %q[%s]: %w", n, g, err)
 		}
 		logger.Info("  exporting foreign index {{index}}[{{global}}}", "index", n, "global", g)
-		err = mgr.GetIndices().Add(cacheindex.NewIndexAlias(g, idx))
+		err = mgr.GetIndices().Add(cacheindex.NewAlias(g, idx))
 		if err != nil {
 			return fmt.Errorf("global index %q[%s]: %w", n, g, err)
 		}
@@ -373,6 +402,11 @@ func (d *_definition[P, T]) CreateController(ctx context.Context, mapping types.
 			return s
 		}
 	}
+
+	finalizer := mgr.GetName() + "/" + d.GetFinalizer()
+	if m, ok := d.GetReconciler().(FinalizerModifier); ok {
+		finalizer = m.ModifyFinalizer(finalizer)
+	}
 	controller := &_controller[P, T]{
 		controllerManager: mgr,
 		logger:            logger,
@@ -385,6 +419,7 @@ func (d *_definition[P, T]) CreateController(ctx context.Context, mapping types.
 		localIndices:      local,
 		allIndices:        all,
 		ohandler:          owner.NewHandler(c),
+		finalizer:         finalizer,
 	}
 	return controller, nil
 }

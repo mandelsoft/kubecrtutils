@@ -7,6 +7,7 @@ import (
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/goutils/set"
 	"github.com/mandelsoft/kubecrtutils/cluster"
+	"github.com/mandelsoft/kubecrtutils/component"
 	"github.com/mandelsoft/kubecrtutils/controller/constraints"
 	"github.com/mandelsoft/kubecrtutils/internal"
 	"github.com/mandelsoft/kubecrtutils/options/activationopts"
@@ -27,6 +28,7 @@ type Definitions interface {
 	activationopts.ControllerSource
 	cluster.ClusterFilter
 
+	CreateIndices(ctx context.Context, mgr types.ControllerManager) error
 	Apply(ctx context.Context, manager types.ControllerManager) (Controllers, error)
 }
 
@@ -82,6 +84,19 @@ func (d *_definitions) Validate(ctx context.Context, opts flagutils.OptionSet, v
 	if copts != nil {
 		d.filter.list = copts.GetActivation()
 	}
+	coopts, err := flagutils.ValidatedOptions[component.Definitions](ctx, opts, v)
+	if err != nil {
+		return err
+	}
+	// ToDo: component mapping
+	for n, c := range d.Elements {
+		for u := range c.GetComponents() {
+			if coopts == nil || coopts.Get(u) == nil {
+				return fmt.Errorf("conroller %q used unknown component %q", n, u)
+			}
+		}
+	}
+
 	return v.ValidateSet(ctx, opts, d.AsOptionSet()) // forward validation
 }
 
@@ -111,30 +126,30 @@ func (d *_definitions) AddFlags(fs *pflag.FlagSet) {
 	d.DefinitionsImpl.AddFlags(fs)
 }
 
-func (d *_definitions) GetUsedClusters(selection ControllerNames) cluster.ClusterNames {
+func (d *_definitions) GetUsedClusters(ctx *constraints.Context) cluster.ClusterNames {
 	names := set.New[string]()
 	for n, c := range d.Elements {
-		if selection.Contains(n) {
+		if ctx.Has(n) {
 			names.AddAll(c.GetRequiredClusters(nil))
 		}
 	}
 	return names
 }
 
-func (d *_definitions) Apply(ctx context.Context, mgr types.ControllerManager) (Controllers, error) {
+func (d *_definitions) CreateIndices(ctx context.Context, mgr types.ControllerManager) error {
 	mgr.GetLogger().Info("configure controller defined indices...")
 	if d.GetError() != nil {
-		return nil, d.GetError()
+		return d.GetError()
 	}
 
-	cctx := constraints.NewContext(d.GetControllerSet())
 	list := d.filter.list
 	if list == nil {
 		list = set.New[string](d.GetNames()...)
 	}
-	err := d.constraints.Match(cctx, list)
+	cctx := constraints.NewContext(d.GetControllerSet()).WithSelectedSet(list)
+	_, err := d.constraints.Match(cctx)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	for _, c := range d.Elements {
@@ -143,9 +158,9 @@ func (d *_definitions) Apply(ctx context.Context, mgr types.ControllerManager) (
 		}
 		cset := c.GetActivationConstraints()
 		if cset.Len() >= 0 {
-			err := cset.Match(cctx, list)
+			_, err := cset.Match(cctx)
 			if err != nil {
-				return nil, err
+				return err
 			}
 		}
 	}
@@ -156,8 +171,16 @@ func (d *_definitions) Apply(ctx context.Context, mgr types.ControllerManager) (
 		}
 		err := c.CreateIndices(ctx, nil, mgr)
 		if err != nil {
-			return nil, err
+			return err
 		}
+	}
+	return nil
+}
+
+func (d *_definitions) Apply(ctx context.Context, mgr types.ControllerManager) (Controllers, error) {
+	mgr.GetLogger().Info("configure controllers...")
+	if d.GetError() != nil {
+		return nil, d.GetError()
 	}
 
 	controllers := NewControllers()
