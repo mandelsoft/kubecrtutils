@@ -17,11 +17,8 @@ import (
 
 const ALL = "all"
 
-type ControllerSet = constraints.ControllerSet
-
-type ControllerSource interface {
-	GetControllerSet() ControllerSet
-}
+type ControllerSet = types.ControllerSet
+type ControllerSource = types.ControllerSource
 
 func From(set flagutils.OptionSet) *Options {
 	return flagutils.GetFrom[*Options](set)
@@ -111,7 +108,7 @@ func (o *Options) handle(h func(name ...string) set.Set[string], name string, ha
 	handled.Delete(name)
 }
 
-func (o *Options) GetContraintContext() *constraints.Context {
+func (o *Options) GetContraintContext() constraints.Context {
 	return constraints.NewContext(o.set).WithSelectedSet(o.GetActivation())
 }
 

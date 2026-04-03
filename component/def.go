@@ -7,6 +7,7 @@ import (
 	"reflect"
 
 	"github.com/mandelsoft/flagutils"
+	"github.com/mandelsoft/goutils/errors"
 	"github.com/mandelsoft/goutils/generics"
 	"github.com/mandelsoft/goutils/maputils"
 	"github.com/mandelsoft/goutils/set"
@@ -20,16 +21,20 @@ import (
 )
 
 type Factory interface {
-	Apply(ctx context.Context, def Definition, set types.Clusters, indices cacheindex.Indices, logger logging.Logger) (types.Index, error)
+	Apply(ctx context.Context, def Definition, set types.Clusters, indices cacheindex.Indices, logger logging.Logger) (Component, error)
 }
 
 type Definition = interface {
 	flagutils.Options
 	GetName() string
 
+	GetComponents() ComponentNames
+
 	GetForeignIndices() cacheindex.Definitions
 	GetActivationConstraints() constraints.Constraints
+
 	GetRequiredClusters(mappings types.ControllerMappings) types.ClusterNames
+	GetRequiredComponents(mappings types.ControllerMappings) ComponentNames
 
 	CreateIndices(ctx context.Context, mapping types.ControllerMappings, mgr types.ControllerManager) error
 	CreateComponent(ctx context.Context, mapping types.ControllerMappings, mgr types.ControllerManager) (Component, error)
@@ -39,6 +44,7 @@ type _definition struct {
 	internal.Element
 	internal.ErrorContainer
 	clusters    types.ClusterNames
+	components  types.ComponentNames
 	constraints constraints.Constraints
 	foreign     cacheindex.Definitions
 	imports     map[string]cacheindex.Definition
@@ -46,11 +52,14 @@ type _definition struct {
 	factory Factory
 }
 
-func Define(name string, fac Factory) Definition {
+var _ Definition = (*_definition)(nil)
+
+func Define(name string, fac Factory) *_definition {
 	return &_definition{
 		Element:        internal.NewElement(name),
 		ErrorContainer: *internal.NewErrorContainer(fmt.Sprintf("component %s", name)),
 		clusters:       types.ClusterNames{},
+		components:     types.ComponentNames{},
 		constraints:    constraints.New(),
 		foreign:        cacheindex.NewDefinitions(),
 		imports:        map[string]cacheindex.Definition{},
@@ -92,6 +101,9 @@ func (d *_definition) AddForeignIndex(indices ...cacheindex.Definition) *_defini
 func (d *_definition) GetClusters() types.ClusterNames {
 	return maps.Clone(d.clusters)
 }
+func (d *_definition) GetComponents() types.ComponentNames {
+	return maps.Clone(d.components)
+}
 
 func (d *_definition) GetActivationConstraints() constraints.Constraints {
 	return d.constraints.Clone()
@@ -101,6 +113,15 @@ func (d *_definition) GetRequiredClusters(mappings types.ControllerMappings) typ
 	names := set.New[string]()
 	m := types.DefaultMappings(mappings).ClusterMappings()
 	for n := range d.GetClusters() {
+		names.Add(m.Map(n))
+	}
+	return names
+}
+
+func (d *_definition) GetRequiredComponents(mappings types.ControllerMappings) types.ComponentNames {
+	names := set.New[string]()
+	m := types.DefaultMappings(mappings).ComponentMappings()
+	for n := range d.GetComponents() {
 		names.Add(m.Map(n))
 	}
 	return names
@@ -128,11 +149,11 @@ func (d *_definition) AsOptionSet() flagutils.OptionSet {
 
 func (d *_definition) Validate(ctx context.Context, opts flagutils.OptionSet, v flagutils.ValidationSet) error {
 	if o, ok := d.factory.(flagutils.Validatable); ok {
-		return o.Validate(ctx, opts, v)
+		return errors.Wrapf(o.Validate(ctx, opts, v), "%s: ", d.GetName())
 	}
 	for _, i := range d.foreign.Elements {
 		if !d.clusters.Contains(i.GetTarget()) {
-			return fmt.Errorf("foreign index %q usines undeclared cluster %q", i.GetName(), i.GetTarget())
+			return fmt.Errorf("component %q: foreign index %q uses undeclared cluster %q", d.GetName(), i.GetName(), i.GetTarget())
 		}
 	}
 	return v.ValidateSet(ctx, opts, d.AsOptionSet())
@@ -176,8 +197,9 @@ func (d *_definition) CreateIndices(ctx context.Context, mapping types.Controlle
 
 func (d *_definition) CreateComponent(ctx context.Context, mapping types.ControllerMappings, mgr types.ControllerManager) (Component, error) {
 	logger := mgr.GetLogger().WithName(d.GetName()).WithValues("component", d.GetName())
-	logger.Info("- configure controller {{controller}}")
+	logger.Info("- configure component {{controller}}")
 
+	mapping = types.DefaultMappings(mapping)
 	clusters, err := cluster.Map(mgr.GetClusters(), mapping.ClusterMappings(), d.GetClusters())
 	if err != nil {
 		return nil, err

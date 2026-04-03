@@ -1,5 +1,7 @@
 package component
 
-type Component interface {
-	GetName() string
-}
+import (
+	"github.com/mandelsoft/kubecrtutils/types"
+)
+
+type Component = types.Component

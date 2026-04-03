@@ -9,20 +9,23 @@ import (
 	"github.com/mandelsoft/kubecrtutils/types"
 )
 
-type clusterconsumer interface {
+type consumer interface {
 	GetClusters() ClusterNames
+	GetComponents() ComponentNames
 	// GetRequiredClusters(mappings types.ControllerMappings) ClusterNames
 }
 
 type mappable[S any] interface {
 	MapCluster(src, tgt string) S
 	MapIndex(src, tgt string) S
+	MapComponent(src, tgt string) S
 }
 
-type _mappings[S clusterconsumer] struct {
-	indices  Mappings
-	clusters Mappings
-	self     S
+type _mappings[S consumer] struct {
+	indices    Mappings
+	clusters   Mappings
+	components Mappings
+	self       S
 }
 
 var (
@@ -34,7 +37,16 @@ func (d *_mappings[S]) IsNone() bool {
 	if d == nil {
 		return true
 	}
-	return (d.indices == nil || len(d.indices) == 0) && (d.clusters == nil || len(d.clusters) == 0)
+	return (d.indices == nil || len(d.indices) == 0) &&
+		(d.clusters == nil || len(d.clusters) == 0) &&
+		(d.components == nil || len(d.components) == 0)
+}
+
+func (d *_mappings[S]) IsComponentsNone() bool {
+	if d == nil {
+		return true
+	}
+	return d.components == nil || len(d.components) == 0
 }
 
 func (d *_mappings[S]) IsClustersNone() bool {
@@ -56,12 +68,21 @@ func (d *_mappings[S]) MapIndex(src, tgt string) S {
 	return d.self
 }
 
+func (d *_mappings[S]) MapComponent(src, tgt string) S {
+	d.components[src] = tgt
+	return d.self
+}
+
 // MapCluster maps a cluster name as used in the controller definition to
 // a global controller manager cluster, when composing a controller
 // set for a controller manager.
 func (d *_mappings[S]) MapCluster(src, tgt string) S {
 	d.clusters[src] = tgt
 	return d.self
+}
+
+func (m *_mappings[S]) ComponentMappings() types.Mappings {
+	return m.components
 }
 
 func (m *_mappings[S]) ClusterMappings() types.Mappings {
@@ -77,8 +98,9 @@ func (m *_mappings[S]) ApplyTo(add types.ControllerMappings) types.ControllerMap
 		return m
 	}
 	return &_mappings[S]{
-		indices:  m.indices.ApplyTo(add.ClusterMappings()),
-		clusters: m.clusters.ApplyTo(add.ClusterMappings()),
+		indices:    m.indices.ApplyTo(add.ClusterMappings()),
+		components: m.components.ApplyTo(add.ComponentMappings()),
+		clusters:   m.clusters.ApplyTo(add.ClusterMappings()),
 	}
 }
 
@@ -91,14 +113,24 @@ func (m *_mappings[S]) GetRequiredClusters(mappings types.ControllerMappings) Cl
 	return names
 }
 
+func (m *_mappings[S]) GetRequiredComponents(mappings types.ControllerMappings) ComponentNames {
+	names := set.New[string]()
+	mp := m.ApplyTo(mappings).ComponentMappings()
+	for n := range m.self.GetComponents() {
+		names.Add(mp.Map(n))
+	}
+	return names
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 
 func WithMappings(def controller.Definition) MappedControllerDefinition {
 	m := &_mappedController{
 		Definition: def,
 		_mappings: _mappings[*_mappedController]{
-			clusters: Mappings{},
-			indices:  Mappings{},
+			clusters:   Mappings{},
+			indices:    Mappings{},
+			components: Mappings{},
 		},
 	}
 	m._mappings.self = m
@@ -117,6 +149,11 @@ var _ controller.Definition = (*_mappedController)(nil)
 func (d *_mappedController) GetRequiredClusters(mappings types.ControllerMappings) ClusterNames {
 	// resolve method
 	return d._mappings.GetRequiredClusters(mappings)
+}
+
+func (d *_mappedController) GetRequiredComponents(mappings types.ControllerMappings) ComponentNames {
+	// resolve method
+	return d._mappings.GetRequiredComponents(mappings)
 }
 
 func (d *_mappedController) GetForeignIndices() cacheindex.Definitions {

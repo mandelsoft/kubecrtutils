@@ -19,19 +19,6 @@ func From(opts flagutils.OptionSetProvider) Definitions {
 	return flagutils.GetFrom[Definitions](opts)
 }
 
-type Definitions interface {
-	internal.Definitions[Definition, Definitions]
-	AddRule(...constraints.Constraint) Definitions
-
-	flagutils.Validatable
-
-	activationopts.ControllerSource
-	cluster.ClusterFilter
-
-	CreateIndices(ctx context.Context, mgr types.ControllerManager) error
-	Apply(ctx context.Context, manager types.ControllerManager) (Controllers, error)
-}
-
 type filter struct {
 	list ControllerNames
 }
@@ -71,7 +58,7 @@ var _ Definitions = (*_definitions)(nil)
 
 func NewDefinitions() Definitions {
 	d := &_definitions{constraints: constraints.New(), groups: make(map[string][]string)}
-	d.DefinitionsImpl = internal.NewDefinitions[Definition, Definitions]("index", d)
+	d.DefinitionsImpl = internal.NewDefinitions[Definition, Definitions]("controller", d)
 	return d
 }
 
@@ -100,7 +87,7 @@ func (d *_definitions) Validate(ctx context.Context, opts flagutils.OptionSet, v
 	return v.ValidateSet(ctx, opts, d.AsOptionSet()) // forward validation
 }
 
-func (d *_definitions) AddRule(constraints ...constraints.Constraint) Definitions {
+func (d *_definitions) AddRule(constraints ...types.Constraint) Definitions {
 	d.constraints.Add(constraints...)
 	return d
 }
@@ -126,11 +113,21 @@ func (d *_definitions) AddFlags(fs *pflag.FlagSet) {
 	d.DefinitionsImpl.AddFlags(fs)
 }
 
-func (d *_definitions) GetUsedClusters(ctx *constraints.Context) cluster.ClusterNames {
+func (d *_definitions) GetUsedClusters(ctx constraints.Context) cluster.ClusterNames {
 	names := set.New[string]()
 	for n, c := range d.Elements {
 		if ctx.Has(n) {
 			names.AddAll(c.GetRequiredClusters(nil))
+		}
+	}
+	return names
+}
+
+func (d *_definitions) GetUsedComponents(ctx constraints.Context) component.ComponentNames {
+	names := set.New[string]()
+	for n, c := range d.Elements {
+		if ctx.Has(n) {
+			names.AddAll(c.GetRequiredComponents(nil))
 		}
 	}
 	return names
@@ -184,7 +181,6 @@ func (d *_definitions) Apply(ctx context.Context, mgr types.ControllerManager) (
 	}
 
 	controllers := NewControllers()
-	mgr.GetLogger().Info("configure controllers...")
 	// Step 1: create controllers and their environment like indices
 	for n, i := range d.Elements {
 		if !d.filter.Use(n) {

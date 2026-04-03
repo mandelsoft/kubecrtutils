@@ -127,7 +127,6 @@ func NewControllerManagerByOpts(ctx context.Context, opts flagutils.OptionSetPro
 	}
 
 	if coopts != nil && coopts.Len() > 0 {
-		logger.Info("configure components...")
 		cm.components, err = coopts.Apply(ctx, cm)
 		if err != nil {
 			return nil, fmt.Errorf("setting up components: %w", err)
@@ -172,6 +171,10 @@ func (cm *_controllermanager) GetLogger() logging.Logger {
 
 func (cm *_controllermanager) GetControllerDefinition(name string) controller.Definition {
 	return cm.definition.GetController(name)
+}
+
+func (cm *_controllermanager) GetComponents() component.Components {
+	return cm.components
 }
 
 func (cm *_controllermanager) GetClusters() cluster.Clusters {

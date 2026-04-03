@@ -6,17 +6,12 @@ import (
 
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/kubecrtutils/cluster/config"
-	"github.com/mandelsoft/kubecrtutils/controller/constraints"
 	"github.com/mandelsoft/kubecrtutils/internal"
-	"github.com/mandelsoft/kubecrtutils/options/activationopts"
 	"github.com/mandelsoft/kubecrtutils/types"
+	"github.com/mandelsoft/kubecrtutils/utils"
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime"
 )
-
-type ClusterFilter interface {
-	GetUsedClusters(*constraints.Context) ClusterNames
-}
 
 func From(opts flagutils.OptionSetProvider) Definitions {
 	return flagutils.GetFrom[Definitions](opts)
@@ -64,14 +59,8 @@ func (d *definitions) AddFlags(fs *pflag.FlagSet) {
 
 func (d *definitions) Validate(ctx context.Context, opts flagutils.OptionSet, v flagutils.ValidationSet) error {
 	// don't establish validation dependencies, just access some metadata.
-	filters := flagutils.Filter[ClusterFilter](opts)
-	required := ClusterNames{}
-	copts := activationopts.From(opts)
-	if copts != nil {
-		for _, f := range filters {
-			required.AddAll(f.GetUsedClusters(copts.GetContraintContext()))
-		}
-	}
+	required := utils.GetUsed[ClusterFilter, ClusterNames](opts)
+
 	if len(required) == 0 {
 		required.Add(d.GetNames()...)
 	}

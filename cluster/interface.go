@@ -14,6 +14,8 @@ type Clusters = types.Clusters
 type ClusterNames = types.ClusterNames
 type Index = types.Index
 
+type ClusterFilter = types.ClusterFilter
+
 func GetClusterFor(c ClusterEquivalent, name string) Cluster {
 	if c == nil {
 		return nil

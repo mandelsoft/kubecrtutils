@@ -11,6 +11,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/controller/builder"
 	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconciler"
 	"github.com/spf13/pflag"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	crtreconcile "sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -40,6 +41,10 @@ type ReconcilerFactory[O flagutils.Options, S any, P kubecrtutils.ObjectPointer[
 	*flagutils.OptionsRef[O]
 }
 
+// New provides a factory for a reconciler based on a support factory handling Options
+// creating a support reconciler providing the Options and a Settings object created based
+// by the given meta factory. The settings can be created based on the final
+// controller instance providing access to all elements defclared in the controller definition.
 func New[O flagutils.Options, S any, P kubecrtutils.ObjectPointer[T], T any](o func() O, s SettingsFactory[O, S, P, T], req RequestFactory[O, S, P, T]) *ReconcilerFactory[O, S, P, T] {
 	return &ReconcilerFactory[O, S, P, T]{req, s, flagutils.NewOptionsRef[O](o)}
 }
@@ -87,4 +92,26 @@ func (f *ReconcilerFactory[O, S, P, T]) CreateReconciler(ctx context.Context, co
 	}
 	r.Info("using main {{ctype}} {{cluster}}[{{info}}]", "ctype", controller.GetCluster().GetTypeInfo(), "cluster", controller.GetCluster().GetName(), "info", controller.GetCluster().GetInfo())
 	return reconciler.CRTReconcilerFor[P](controller, r, 0), nil
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+type DefaultFactory[O flagutils.Options, A any, P kubecrtutils.ObjectPointer[T], T any] struct{}
+
+var _ Factory[None, None, *v1.Secret, v1.Secret] = (*testFactory[None, None, *v1.Secret, v1.Secret])(nil)
+
+func (f *DefaultFactory[O, S, P, T]) CreateOptions() O {
+	return generics.ObjectFor[O]()
+}
+
+func (f *DefaultFactory[O, S, P, T]) CreateSettings(ctx context.Context, o None, controller controller.TypedController[P, T]) (S, error) {
+	return generics.ObjectFor[S](), nil
+}
+
+type testFactory[O flagutils.Options, S any, P kubecrtutils.ObjectPointer[T], T any] struct {
+	DefaultFactory[O, S, P, T]
+}
+
+func (f *testFactory[O, S, P, T]) CreateRequest(r *reconciler.BaseRequest[P], r2 *Reconciler[None, None, P, T]) reconciler.ReconcileRequest[P] {
+	panic("implement me")
 }

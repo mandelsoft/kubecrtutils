@@ -23,3 +23,6 @@ type TypedController[P kubecrtutils.ObjectPointer[T], T any] interface {
 }
 
 type ClusterNames = types.ClusterNames
+
+type Definitions = types.ControllerDefinitions
+type Definition = types.ControllerDefinition

@@ -6,7 +6,7 @@ import (
 
 type _and []Constraint
 
-func (o _and) Match(ctx *Context) (Activation, error) {
+func (o _and) Match(ctx Context) (Activation, error) {
 	var rerr error
 
 	r := NoOpinion
@@ -30,7 +30,7 @@ func And(constraints ...Constraint) Constraint {
 
 type _or []Constraint
 
-func (o _or) Match(ctx *Context) (Activation, error) {
+func (o _or) Match(ctx Context) (Activation, error) {
 	var rerr error
 	found := false
 	r := NoOpinion
@@ -63,7 +63,7 @@ func Not(constraint Constraint) Constraint {
 	return _not{constraint}
 }
 
-func (o _not) Match(ctx *Context) (Activation, error) {
+func (o _not) Match(ctx Context) (Activation, error) {
 	a, err := o.cond.Match(ctx)
 	return a.Not(), err
 }

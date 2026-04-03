@@ -15,7 +15,7 @@ func Complete(grps ...string) Constraint {
 	return &_complete{groups: grps}
 }
 
-func (r *_complete) Match(ctx *Context) (Activation, error) {
+func (r *_complete) Match(ctx Context) (Activation, error) {
 	for _, group := range r.groups {
 		g := ctx.GetGroup(group)
 		if g == nil {

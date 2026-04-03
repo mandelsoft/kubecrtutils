@@ -44,8 +44,6 @@ func (f ReconcilerFactoryFunc[P, T]) CreateReconciler(ctx context.Context, contr
 
 ////////////////////////////////////////////////////////////////////////////////
 
-type Definition = types.ControllerDefinition
-
 type TypedDefinition[P kubecrtutils.ObjectPointer[T], T any] interface {
 	Definition
 
@@ -64,6 +62,7 @@ type TypedDefinition[P kubecrtutils.ObjectPointer[T], T any] interface {
 	ImportIndex(reference cacheindex.Reference) TypedDefinition[P, T]
 	AddTrigger(trigger ...ResourceTriggerDefinition) TypedDefinition[P, T]
 	UseCluster(name ...string) TypedDefinition[P, T]
+	UseComponent(name ...string) TypedDefinition[P, T]
 }
 
 type _definition[P kubecrtutils.ObjectPointer[T], T any] struct {
@@ -94,7 +93,8 @@ func Define[P kubecrtutils.ObjectPointer[T], T any](name string, cluster string,
 		Element:        internal.NewElement(name),
 		ErrorContainer: *internal.NewErrorContainer(fmt.Sprintf("controller %s", name)),
 		cluster:        cluster,
-		clusters:       set.New[string](cluster),
+		components:     component.ComponentNames{},
+		clusters:       ClusterNames{},
 		proto:          generics.ObjectFor[P](),
 		reconciler:     fac,
 		indices:        map[string]cacheindex.TypedDefinition[P, T]{},
@@ -103,6 +103,7 @@ func Define[P kubecrtutils.ObjectPointer[T], T any](name string, cluster string,
 		constraints:    constraints.New(),
 		foreign:        cacheindex.NewDefinitions(),
 	}
+	d.clusters.Add(cluster)
 	return d
 }
 
@@ -204,7 +205,7 @@ func (d *_definition[P, T]) Validate(ctx context.Context, opts flagutils.OptionS
 	}
 	for _, i := range d.foreign.Elements {
 		if !d.clusters.Contains(i.GetTarget()) {
-			return fmt.Errorf("foreign index %q usines undeclared cluster %q", i.GetName(), i.GetTarget())
+			return fmt.Errorf("foreign index %q uses undeclared cluster %q", i.GetName(), i.GetTarget())
 		}
 	}
 	return v.ValidateSet(ctx, opts, d.AsOptionSet())
@@ -246,6 +247,15 @@ func (d *_definition[P, T]) GetRequiredClusters(mappings types.ControllerMapping
 	names := set.New[string]()
 	m := types.DefaultMappings(mappings).ClusterMappings()
 	for n := range d.GetClusters() {
+		names.Add(m.Map(n))
+	}
+	return names
+}
+
+func (d *_definition[P, T]) GetRequiredComponents(mappings types.ControllerMappings) component.ComponentNames {
+	names := set.New[string]()
+	m := types.DefaultMappings(mappings).ComponentMappings()
+	for n := range d.GetComponents() {
 		names.Add(m.Map(n))
 	}
 	return names
@@ -350,6 +360,16 @@ func (d *_definition[P, T]) CreateController(ctx context.Context, mapping types.
 	logger := mgr.GetLogger().WithName(d.GetName()).WithValues("controller", d.GetName())
 	logger.Info("- configure controller {{controller}}")
 
+	base := mgr.GetComponents()
+	components := component.NewComponents()
+	for n := range d.components {
+		if c := base.Get(n); c != nil {
+			components.Add(c)
+		} else {
+			return nil, fmt.Errorf("component %q not found", n)
+		}
+	}
+
 	clusters, err := cluster.Map(mgr.GetClusters(), mapping.ClusterMappings(), d.GetClusters())
 	if err != nil {
 		return nil, err
@@ -358,7 +378,7 @@ func (d *_definition[P, T]) CreateController(ctx context.Context, mapping types.
 	// keep logical view on technical cluster as requested by the definition
 	c := clusters.Get(d.cluster)
 	if c == nil {
-		return nil, fmt.Errorf("cluster %q not found", d.GetName())
+		return nil, fmt.Errorf("cluster %q not found", d.cluster)
 	}
 
 	gk, err := kubecrtutils.GKForObject(c, d.proto)
@@ -411,6 +431,7 @@ func (d *_definition[P, T]) CreateController(ctx context.Context, mapping types.
 		controllerManager: mgr,
 		logger:            logger,
 		mappings:          mapping.ClusterMappings(),
+		components:        components,
 		clusters:          clusters,
 		cluster:           c,
 		gk:                gk,

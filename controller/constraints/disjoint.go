@@ -12,7 +12,7 @@ func Disjoint(grps ...string) Constraint {
 	return &_disjoint{groups: grps}
 }
 
-func (r *_disjoint) Match(ctx *Context) (Activation, error) {
+func (r *_disjoint) Match(ctx Context) (Activation, error) {
 
 	for i := 0; i < len(r.groups); i++ {
 		found := ""

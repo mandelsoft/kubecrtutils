@@ -67,11 +67,11 @@ type _group[T Named] struct {
 }
 
 func NewGroup[T Named](name string) Group[T] {
-	return &_group[T]{typename: name, elements: make(map[string]T), ErrorContainer: *NewErrorContainer(fmt.Sprintf("%s set:", name))}
+	return &_group[T]{typename: name, elements: make(map[string]T), ErrorContainer: *NewErrorContainer(fmt.Sprintf("%s set", name))}
 }
 
 func newGroup[T Named](name string) _group[T] {
-	return _group[T]{typename: name, elements: make(map[string]T), ErrorContainer: *NewErrorContainer(fmt.Sprintf("%s set:", name))}
+	return _group[T]{typename: name, elements: make(map[string]T), ErrorContainer: *NewErrorContainer(fmt.Sprintf("%s set", name))}
 }
 
 func (c *_group[T]) GetName() string {
@@ -93,10 +93,10 @@ func (c *_group[T]) add(elem ...T) error {
 
 	for _, e := range elem {
 		if _, ok := c.elements[e.GetName()]; ok {
-			err = c.AddError(errors.Join(err, fmt.Errorf("%s %q already exists", c.typename, e.GetName())), "", errors.Join(err, fmt.Errorf("%s %q already exists", c.typename, e.GetName())))
+			err = c.AddError(fmt.Errorf("%s %q already exists", c.typename, e.GetName()))
 		} else {
 			c.elements[e.GetName()] = e
-			err = c.AddError(e, fmt.Sprintf("%s %s", c.typename, e.GetName()), e)
+			err = c.AddError(e, fmt.Sprintf("%s %s", c.typename, e.GetName()))
 		}
 	}
 	return err

@@ -18,3 +18,13 @@ func ConvertIndexerFunc[T client.Object](f IndexerFunc[T]) client.IndexerFunc {
 		return f(any(object).(T))
 	}
 }
+
+func ConvertIndexerFactory[T client.Object](f TypedIndexerFactory[T]) IndexerFactory {
+	return func(ctx context.Context, logger logging.Logger, clusters Clusters) (client.IndexerFunc, error) {
+		idx, err := f(ctx, logger, clusters)
+		if err != nil {
+			return nil, err
+		}
+		return ConvertIndexerFunc(idx), nil
+	}
+}

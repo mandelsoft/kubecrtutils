@@ -10,10 +10,7 @@ import (
 
 type ComponentNames = types.ComponentNames
 
-type Components interface {
-	internal.Group[Component]
-	IsDisabled(name string) bool
-}
+type Components = types.Components
 
 type components struct {
 	internal.Group[Component]

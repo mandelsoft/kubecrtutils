@@ -6,13 +6,12 @@ import (
 
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/goutils/general"
-	. "github.com/mandelsoft/kubecrtutils/log"
-
 	"github.com/mandelsoft/kubecrtutils"
 	"github.com/mandelsoft/kubecrtutils/cacheindex"
 	"github.com/mandelsoft/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubecrtutils/cluster/clustercontext"
 	abuilder "github.com/mandelsoft/kubecrtutils/controller/builder"
+	. "github.com/mandelsoft/kubecrtutils/log"
 	"github.com/mandelsoft/kubecrtutils/objutils"
 	"github.com/mandelsoft/kubecrtutils/owner"
 	"github.com/mandelsoft/kubecrtutils/types"
@@ -43,6 +42,7 @@ type _controller[P kubecrtutils.ObjectPointer[T], T any] struct {
 	definition           TypedDefinition[P, T]
 	logger               logging.Logger
 	mappings             types.Mappings // cluster mappings
+	components           types.Components
 	clusters             types.Clusters
 	cluster              types.ClusterEquivalent
 	gk                   schema.GroupKind
@@ -88,6 +88,10 @@ func (c *_controller[P, T]) GetClusterMappings() types.Mappings {
 
 func (c *_controller[P, T]) GetClusters() types.Clusters {
 	return c.clusters
+}
+
+func (c *_controller[P, T]) GetComponents() types.Components {
+	return c.components
 }
 
 func (c *_controller[P, T]) GetResource() client.Object {

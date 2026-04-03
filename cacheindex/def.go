@@ -12,12 +12,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type IndexerFunc[T client.Object] = types.IndexerFunc[T]
-
-type IndexerFactory = types.IndexerFactory
-
-type Definition = types.IndexDefinition
-
 type Reference interface {
 	Definition
 	IsRef() bool
@@ -69,6 +63,15 @@ func Define[P kubecrtutils.ObjectPointer[T], T any](name string, target string, 
 		Element:        internal.NewElement(name),
 		target:         target,
 		indexerFactory: Lift(ConvertIndexerFunc(idxfunc)),
+		proto:          generics.ObjectFor[P](),
+	}
+}
+
+func DefineByFactory[P kubecrtutils.ObjectPointer[T], T any](name string, target string, idxfactory TypedIndexerFactory[P]) TypedDefinition[P, T] {
+	return &_definition[P, T]{
+		Element:        internal.NewElement(name),
+		target:         target,
+		indexerFactory: ConvertIndexerFactory(idxfactory),
 		proto:          generics.ObjectFor[P](),
 	}
 }

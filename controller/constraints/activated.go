@@ -6,7 +6,7 @@ func Activated(names ...string) Constraint {
 	return _activated(names)
 }
 
-func (a _activated) Match(ctx *Context) (Activation, error) {
+func (a _activated) Match(ctx Context) (Activation, error) {
 	if len(a) == 0 {
 		return NoOpinion, nil
 	}

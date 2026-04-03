@@ -106,8 +106,8 @@ github.com/mandelsoft/filepath v0.0.0-20240223090642-3e2777258aa3 h1:oo9nIgnyiBg
 github.com/mandelsoft/filepath v0.0.0-20240223090642-3e2777258aa3/go.mod h1:LxhqC7khDoRENwooP6f/vWvia9ivj6TqLYrR39zqkN0=
 github.com/mandelsoft/flagutils v0.0.0-20260329130458-d5b113d3e248 h1:/LgzfppEjOw+48AYVSvascEoaLPlogn91Nf/d3Dlhv4=
 github.com/mandelsoft/flagutils v0.0.0-20260329130458-d5b113d3e248/go.mod h1:r3hszDEdhvqBhqSnvAayeMKnSKNmA+pyHUBw9y4CR5E=
-github.com/mandelsoft/goutils v0.0.0-20260401191756-af3f27500a0e h1:jsG8oKHD5FCiWOWgIfoqxYwElw1Zn1O3a6f8mhh1774=
-github.com/mandelsoft/goutils v0.0.0-20260401191756-af3f27500a0e/go.mod h1:fTCyGFCMm+ugUn1FqcHeWelCjoSYtkJaqnJvSmgkx1M=
+github.com/mandelsoft/goutils v0.0.0-20260403134733-619dbccc5bdb h1:M2SONm8eHPa33d+oWDplEl6z3zGcCQC9ReiiwKVCQr4=
+github.com/mandelsoft/goutils v0.0.0-20260403134733-619dbccc5bdb/go.mod h1:fTCyGFCMm+ugUn1FqcHeWelCjoSYtkJaqnJvSmgkx1M=
 github.com/mandelsoft/logging v0.0.0-20260220094735-62d1006ceeb4 h1:wkcH/MKmgUiqvvq+KueAXaQ8iCoVWKghLEof7LGDPM4=
 github.com/mandelsoft/logging v0.0.0-20260220094735-62d1006ceeb4/go.mod h1:uO460C1lIB3IOOgrbXhAlz3AKsOv4T2K6ALBn3PwuSg=
 github.com/mandelsoft/vfs v0.4.5-0.20250514111339-d7b067920e91 h1:11lzvnGwbdzG9yURbVnBo6sLk1peCrZr4UlEQKYzb1g=

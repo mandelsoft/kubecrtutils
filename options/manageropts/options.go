@@ -5,10 +5,12 @@ import (
 	"fmt"
 
 	"github.com/mandelsoft/flagutils"
+	"github.com/mandelsoft/goutils/set"
 	"github.com/mandelsoft/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubecrtutils/options/metricsopts"
 	"github.com/mandelsoft/kubecrtutils/options/tlsopts"
 	"github.com/mandelsoft/kubecrtutils/options/webhookopts"
+	"github.com/mandelsoft/kubecrtutils/types"
 	"github.com/mandelsoft/logging"
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -37,6 +39,8 @@ type Options struct {
 	// the manager is created.
 	Configurations []ConfigurationProvider
 }
+
+var _ cluster.ClusterFilter = (*Options)(nil)
 
 func From(opts flagutils.OptionSetProvider) *Options {
 	return flagutils.GetFrom[*Options](opts)
@@ -101,6 +105,10 @@ func (o *Options) AsOptionSet() flagutils.OptionSet {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+
+func (o *Options) GetUsedClusters(types.ConstraintContext) types.ClusterNames {
+	return set.New[string](o.main)
+}
 
 func (o *Options) GetMain() string {
 	return o.main

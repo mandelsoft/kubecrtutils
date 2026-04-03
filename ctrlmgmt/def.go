@@ -24,8 +24,10 @@ type Definition interface {
 	internal.Named
 	flagutils.Options
 	flagutils.OptionSetProvider
+
 	WithScheme(scheme *runtime.Scheme) Definition
 	AddCluster(def ...cluster.Definition) Definition
+	AddComponent(def ...component.Definition) Definition
 	AddController(def ...controller.Definition) Definition
 	AddControllerRule(rules ...constraints.Constraint) Definition
 	AddIndex(def ...cacheindex.Definition) Definition
@@ -64,6 +66,11 @@ func (d *definition) WithScheme(scheme *runtime.Scheme) Definition {
 
 func (d *definition) AddCluster(def ...cluster.Definition) Definition {
 	d.clusters.Add(def...)
+	return d
+}
+
+func (d *definition) AddComponent(def ...component.Definition) Definition {
+	d.components.Add(def...)
 	return d
 }
 
