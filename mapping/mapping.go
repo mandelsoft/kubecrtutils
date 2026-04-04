@@ -3,6 +3,7 @@ package mapping
 import (
 	"maps"
 
+	"github.com/mandelsoft/kubecrtutils/types/plain"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -13,6 +14,17 @@ func (m Mappings) Map(local string) string {
 		return local
 	}
 	return m[local]
+}
+
+func (m Mappings) GetMapped(set plain.NameSet) plain.NameSet {
+	if len(m) == 0 {
+		return set
+	}
+	mapped := plain.NewNameSet()
+	for n := range m {
+		mapped.Add(m.Map(n))
+	}
+	return mapped
 }
 
 func (m Mappings) ApplyTo(add Mappings) Mappings {

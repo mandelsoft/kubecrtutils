@@ -25,6 +25,7 @@ type TypedDefinition[P kubecrtutils.ObjectPointer[T], T any] interface {
 
 type _definition[P kubecrtutils.ObjectPointer[T], T any] struct {
 	internal.Element
+	mapping.DefaultClusterConsumer
 	target         string
 	proto          client.Object
 	indexerFactory IndexerFactory
@@ -40,10 +41,11 @@ func (r *_reference[P, T]) IsRef() bool {
 
 func Ref[P kubecrtutils.ObjectPointer[T], T any](name string, target string) Reference {
 	return &_reference[P, T]{_definition[P, T]{
-		Element:        internal.NewElement(name),
-		target:         target,
-		indexerFactory: nil,
-		proto:          generics.ObjectFor[P](),
+		Element:                internal.NewElement(name),
+		DefaultClusterConsumer: *mapping.NewDefaultClusterConsumer(target),
+		target:                 target,
+		indexerFactory:         nil,
+		proto:                  generics.ObjectFor[P](),
 	}}
 }
 
@@ -51,29 +53,33 @@ func (r *_reference[P, T]) ApplyMappings(mappings mapping.ControllerMappings) De
 	if mappings == nil || mappings.IsNone() {
 		return r
 	}
+	target := mappings.ClusterMappings().Map(r.target)
 	return &_reference[P, T]{_definition[P, T]{
-		Element:        internal.NewElement(mappings.IndexMappings().Map(r.GetName())),
-		target:         mappings.ClusterMappings().Map(r.target),
-		indexerFactory: r.indexerFactory,
-		proto:          r.proto,
+		Element:                internal.NewElement(mappings.IndexMappings().Map(r.GetName())),
+		DefaultClusterConsumer: *mapping.NewDefaultClusterConsumer(target),
+		target:                 target,
+		indexerFactory:         r.indexerFactory,
+		proto:                  r.proto,
 	}}
 }
 
 func Define[P kubecrtutils.ObjectPointer[T], T any](name string, target string, idxfunc IndexerFunc[P]) TypedDefinition[P, T] {
 	return &_definition[P, T]{
-		Element:        internal.NewElement(name),
-		target:         target,
-		indexerFactory: Lift(ConvertIndexerFunc(idxfunc)),
-		proto:          generics.ObjectFor[P](),
+		Element:                internal.NewElement(name),
+		DefaultClusterConsumer: *mapping.NewDefaultClusterConsumer(target),
+		target:                 target,
+		indexerFactory:         Lift(ConvertIndexerFunc(idxfunc)),
+		proto:                  generics.ObjectFor[P](),
 	}
 }
 
 func DefineByFactory[P kubecrtutils.ObjectPointer[T], T any](name string, target string, idxfactory TypedIndexerFactory[P]) TypedDefinition[P, T] {
 	return &_definition[P, T]{
-		Element:        internal.NewElement(name),
-		target:         target,
-		indexerFactory: ConvertIndexerFactory(idxfactory),
-		proto:          generics.ObjectFor[P](),
+		Element:                internal.NewElement(name),
+		DefaultClusterConsumer: *mapping.NewDefaultClusterConsumer(target),
+		target:                 target,
+		indexerFactory:         ConvertIndexerFactory(idxfactory),
+		proto:                  generics.ObjectFor[P](),
 	}
 }
 
@@ -81,11 +87,13 @@ func (d *_definition[P, T]) ApplyMappings(mappings mapping.ControllerMappings) D
 	if mappings == nil || mappings.IsNone() {
 		return d
 	}
+	target := mappings.ClusterMappings().Map(d.target)
 	return &_definition[P, T]{
-		Element:        internal.NewElement(mappings.IndexMappings().Map(d.GetName())),
-		target:         mappings.ClusterMappings().Map(d.target),
-		indexerFactory: d.indexerFactory,
-		proto:          d.proto,
+		Element:                internal.NewElement(mappings.IndexMappings().Map(d.GetName())),
+		DefaultClusterConsumer: *mapping.NewDefaultClusterConsumer(target),
+		target:                 target,
+		indexerFactory:         d.indexerFactory,
+		proto:                  d.proto,
 	}
 }
 

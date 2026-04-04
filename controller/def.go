@@ -69,10 +69,9 @@ type TypedDefinition[P kubecrtutils.ObjectPointer[T], T any] interface {
 type _definition[P kubecrtutils.ObjectPointer[T], T any] struct {
 	internal.Element
 	internal.ErrorContainer
+	mapping.DefaultConsumer
 	predicates  []predicate.Predicate
 	cluster     string
-	clusters    ClusterNames
-	components  component.ComponentNames
 	proto       client.Object
 	reconciler  ReconcilerFactory[P, T]
 	indices     map[string]cacheindex.TypedDefinition[P, T]
@@ -91,20 +90,19 @@ func DefineByFunc[P kubecrtutils.ObjectPointer[T], T any](name string, cluster s
 
 func Define[P kubecrtutils.ObjectPointer[T], T any](name string, cluster string, fac ReconcilerFactory[P, T]) TypedDefinition[P, T] {
 	d := &_definition[P, T]{
-		Element:        internal.NewElement(name),
-		ErrorContainer: *internal.NewErrorContainer(fmt.Sprintf("controller %s", name)),
-		cluster:        cluster,
-		components:     component.ComponentNames{},
-		clusters:       ClusterNames{},
-		proto:          generics.ObjectFor[P](),
-		reconciler:     fac,
-		indices:        map[string]cacheindex.TypedDefinition[P, T]{},
-		imports:        map[string]cacheindex.Definition{},
-		groups:         set.New[string](),
-		constraints:    constraints.New(),
-		foreign:        cacheindex.NewDefinitions(),
+		Element:         internal.NewElement(name),
+		ErrorContainer:  *internal.NewErrorContainer(fmt.Sprintf("controller %s", name)),
+		DefaultConsumer: *mapping.NewDefaultConsumer(),
+		cluster:         cluster,
+		proto:           generics.ObjectFor[P](),
+		reconciler:      fac,
+		indices:         map[string]cacheindex.TypedDefinition[P, T]{},
+		imports:         map[string]cacheindex.Definition{},
+		groups:          set.New[string](),
+		constraints:     constraints.New(),
+		foreign:         cacheindex.NewDefinitions(),
 	}
-	d.clusters.Add(cluster)
+	d.UseCluster(cluster)
 	return d
 }
 
@@ -124,12 +122,12 @@ func (d *_definition[P, T]) WithFinalizer(s string) TypedDefinition[P, T] {
 }
 
 func (d *_definition[P, T]) UseCluster(name ...string) TypedDefinition[P, T] {
-	d.clusters.Add(name...)
+	d.DefaultConsumer.UseCluster(name...)
 	return d
 }
 
 func (d *_definition[P, T]) UseComponent(name ...string) TypedDefinition[P, T] {
-	d.components.Add(name...)
+	d.DefaultConsumer.UseComponent(name...)
 	return d
 }
 
@@ -157,7 +155,7 @@ func (d *_definition[P, T]) AddIndex(name string, indexerFunc cacheindex.Indexer
 		i := cacheindex.Define[P, T](name, d.cluster, indexerFunc)
 		d.indices[name] = i
 		d.AddError(i, "index ", name)
-		d.clusters.Add(i.GetTarget())
+		d.UseCluster(i.GetTarget())
 	}
 	return d
 }
@@ -176,7 +174,7 @@ func (d *_definition[P, T]) AddTrigger(trigger ...ResourceTriggerDefinition) Typ
 	for _, t := range trigger {
 		d.triggers = append(d.triggers, t)
 		if t.GetCluster() != "" {
-			d.clusters.Add(t.GetCluster())
+			d.UseCluster(t.GetCluster())
 		}
 	}
 	return d
@@ -205,7 +203,7 @@ func (d *_definition[P, T]) Validate(ctx context.Context, opts flagutils.OptionS
 		return o.Validate(ctx, opts, v)
 	}
 	for _, i := range d.foreign.Elements {
-		if !d.clusters.Contains(i.GetTarget()) {
+		if !d.GetClusters().Contains(i.GetTarget()) {
 			return fmt.Errorf("foreign index %q uses undeclared cluster %q", i.GetName(), i.GetTarget())
 		}
 	}
@@ -221,10 +219,6 @@ func (d *_definition[P, T]) Finalize(ctx context.Context, opts flagutils.OptionS
 
 ////////////////////////////////////////////////////////////////////////////////
 
-func (d *_definition[P, T]) GetCluster() string {
-	return d.cluster
-}
-
 func (d *_definition[P, T]) GetFinalizer() string {
 	if d.finalizer == "" {
 		return d.GetName()
@@ -232,34 +226,12 @@ func (d *_definition[P, T]) GetFinalizer() string {
 	return d.finalizer
 }
 
-func (d *_definition[P, T]) GetComponents() component.ComponentNames {
-	return maps.Clone(d.components)
-}
-
-func (d *_definition[P, T]) GetClusters() ClusterNames {
-	return maps.Clone(d.clusters)
-}
-
 func (d *_definition[P, T]) GetActivationConstraints() constraints.Constraints {
 	return d.constraints.Clone()
 }
 
-func (d *_definition[P, T]) GetRequiredClusters(mappings mapping.ControllerMappings) ClusterNames {
-	names := set.New[string]()
-	m := mapping.DefaultMappings(mappings).ClusterMappings()
-	for n := range d.GetClusters() {
-		names.Add(m.Map(n))
-	}
-	return names
-}
-
-func (d *_definition[P, T]) GetRequiredComponents(mappings mapping.ControllerMappings) component.ComponentNames {
-	names := set.New[string]()
-	m := mapping.DefaultMappings(mappings).ComponentMappings()
-	for n := range d.GetComponents() {
-		names.Add(m.Map(n))
-	}
-	return names
+func (d *_definition[P, T]) GetCluster() string {
+	return d.cluster
 }
 
 func (d *_definition[T, P]) GetGroups() set.Set[string] {

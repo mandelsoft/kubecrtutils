@@ -3,14 +3,12 @@ package component
 import (
 	"context"
 	"fmt"
-	"maps"
 	"reflect"
 
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/goutils/errors"
 	"github.com/mandelsoft/goutils/generics"
 	"github.com/mandelsoft/goutils/maputils"
-	"github.com/mandelsoft/goutils/set"
 	"github.com/mandelsoft/kubecrtutils/cacheindex"
 	"github.com/mandelsoft/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubecrtutils/controller/constraints"
@@ -44,8 +42,7 @@ type Definition = interface {
 type _definition struct {
 	internal.Element
 	internal.ErrorContainer
-	clusters    types.ClusterNames
-	components  types.ComponentNames
+	mapping.DefaultConsumer
 	constraints constraints.Constraints
 	foreign     cacheindex.Definitions
 	imports     map[string]cacheindex.Definition
@@ -57,19 +54,23 @@ var _ Definition = (*_definition)(nil)
 
 func Define(name string, fac Factory) *_definition {
 	return &_definition{
-		Element:        internal.NewElement(name),
-		ErrorContainer: *internal.NewErrorContainer(fmt.Sprintf("component %s", name)),
-		clusters:       types.ClusterNames{},
-		components:     types.ComponentNames{},
-		constraints:    constraints.New(),
-		foreign:        cacheindex.NewDefinitions(),
-		imports:        map[string]cacheindex.Definition{},
-		factory:        fac,
+		Element:         internal.NewElement(name),
+		ErrorContainer:  *internal.NewErrorContainer(fmt.Sprintf("component %s", name)),
+		DefaultConsumer: *mapping.NewDefaultConsumer(),
+		constraints:     constraints.New(),
+		foreign:         cacheindex.NewDefinitions(),
+		imports:         map[string]cacheindex.Definition{},
+		factory:         fac,
 	}
 }
 
 func (d *_definition) UseCluster(name ...string) *_definition {
-	d.clusters.Add(name...)
+	d.DefaultConsumer.UseCluster(name...)
+	return d
+}
+
+func (d *_definition) UseComponent(name ...string) *_definition {
+	d.DefaultConsumer.UseComponent(name...)
 	return d
 }
 
@@ -99,33 +100,8 @@ func (d *_definition) AddForeignIndex(indices ...cacheindex.Definition) *_defini
 	return d
 }
 
-func (d *_definition) GetClusters() types.ClusterNames {
-	return maps.Clone(d.clusters)
-}
-func (d *_definition) GetComponents() types.ComponentNames {
-	return maps.Clone(d.components)
-}
-
 func (d *_definition) GetActivationConstraints() constraints.Constraints {
 	return d.constraints.Clone()
-}
-
-func (d *_definition) GetRequiredClusters(mappings mapping.ControllerMappings) types.ClusterNames {
-	names := set.New[string]()
-	m := mapping.DefaultMappings(mappings).ClusterMappings()
-	for n := range d.GetClusters() {
-		names.Add(m.Map(n))
-	}
-	return names
-}
-
-func (d *_definition) GetRequiredComponents(mappings mapping.ControllerMappings) types.ComponentNames {
-	names := set.New[string]()
-	m := mapping.DefaultMappings(mappings).ComponentMappings()
-	for n := range d.GetComponents() {
-		names.Add(m.Map(n))
-	}
-	return names
 }
 
 func (d *_definition) GetForeignIndices() cacheindex.Definitions {
@@ -153,7 +129,7 @@ func (d *_definition) Validate(ctx context.Context, opts flagutils.OptionSet, v 
 		return errors.Wrapf(o.Validate(ctx, opts, v), "%s: ", d.GetName())
 	}
 	for _, i := range d.foreign.Elements {
-		if !d.clusters.Contains(i.GetTarget()) {
+		if !d.GetClusters().Contains(i.GetTarget()) {
 			return fmt.Errorf("component %q: foreign index %q uses undeclared cluster %q", d.GetName(), i.GetName(), i.GetTarget())
 		}
 	}
