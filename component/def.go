@@ -8,9 +8,7 @@ import (
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/goutils/errors"
 	"github.com/mandelsoft/goutils/generics"
-	"github.com/mandelsoft/goutils/maputils"
 	"github.com/mandelsoft/kubecrtutils/cacheindex"
-	"github.com/mandelsoft/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubecrtutils/controller/constraints"
 	"github.com/mandelsoft/kubecrtutils/internal"
 	"github.com/mandelsoft/kubecrtutils/mapping"
@@ -144,45 +142,29 @@ func (d *_definition) Finalize(ctx context.Context, opts flagutils.OptionSet, v 
 }
 
 func (d *_definition) CreateIndices(ctx context.Context, m mapping.ControllerMappings, mgr types.ControllerManager) error {
-	m = mapping.DefaultMappings(m)
-	clusters, err := cluster.Map(mgr.GetClusters(), m.ClusterMappings(), d.GetClusters())
-	if err != nil {
-		return err
-	}
 	logger := mgr.GetLogger().WithName(d.GetName()).WithValues("component", d.GetName())
-	idxmap := m.IndexMappings()
-
-	// hmm we could add the foreign indices directly to the global index definitions.
-	// and use here simple imports instead.
 
 	for n, i := range d.foreign.Elements {
-		g := idxmap.Map(n)
-		logger.Info("- configuring foreign index {{index}}[{{global}}] from controller {{controller}}", "index", n, "global", g, "controller", d.GetName())
-		idx, err := i.Apply(ctx, clusters, logger)
+		logger.Info("- configuring foreign index {{index}} from component {{component}}", "index", n, "component", d.GetName())
+		err := i.Apply(ctx, m, mgr)
 		if err != nil {
-			return fmt.Errorf("index %q[%s]: %w", n, g, err)
-		}
-		logger.Info("  exporting foreign index {{index}}[{{global}}}", "index", n, "global", g)
-		err = mgr.GetIndices().Add(cacheindex.NewAlias(g, idx))
-		if err != nil {
-			return fmt.Errorf("global index %q[%s]: %w", n, g, err)
+			return fmt.Errorf("component %q: index %q: %w", d.GetName(), n, err)
 		}
 	}
-
 	return nil
 }
 
 func (d *_definition) Apply(ctx context.Context, m mapping.ControllerMappings, mgr types.ControllerManager) (Component, error) {
 	logger := mgr.GetLogger().WithName(d.GetName()).WithValues("component", d.GetName())
-	logger.Info("- configure component {{controller}}")
+	logger.Info("- configure component {{component}}", "component", d.GetName())
 
 	m = mapping.DefaultMappings(m)
-	clusters, err := cluster.Map(mgr.GetClusters(), m.ClusterMappings(), d.GetClusters())
+	clusters, err := mgr.GetClusters().Map(m.ClusterMappings(), d.GetClusters())
 	if err != nil {
 		return nil, err
 	}
 
-	comps, err := Map(mgr.GetComponents(), m.ComponentMappings(), d.GetComponents())
+	comps, err := mgr.GetComponents().Map(m.ComponentMappings(), d.GetComponents())
 	if err != nil {
 		return nil, err
 	}
@@ -203,7 +185,9 @@ func (d *_definition) Apply(ctx context.Context, m mapping.ControllerMappings, m
 	}
 
 	indices := cacheindex.NewIndices()
-	indices.Add(maputils.Values(all)...)
+	for n, i := range all {
+		indices.Add(cacheindex.NewAlias(n, i))
+	}
 
 	b := &Base{
 		Logger:   logger,
@@ -223,25 +207,26 @@ func (d *_definition) Apply(ctx context.Context, m mapping.ControllerMappings, m
 
 func registerIndex[I cacheindex.Index](logger logging.Logger, i cacheindex.Definition, clusters types.Clusters, idxmap mapping.Mappings, mgr types.ControllerManager, local map[string]I) (cacheindex.Index, error) {
 	n := i.GetName()
-	g := idxmap.Map(n)
+	c := clusters.Get(i.GetTarget()).GetEffective()
+	glob := cacheindex.ComposeName(idxmap.Map(n), c.GetName())
+
 	// import indexer
-	idx := mgr.GetIndex(g)
+	idx := mgr.GetIndex(glob)
 	if idx == nil {
-		return nil, fmt.Errorf("imported index %q[%s] not found", n, g)
+		return nil, fmt.Errorf("index %q->%q not found", n, glob)
 	}
 
 	f := i.GetIndexer()
 	if f == nil {
-		logger.Info("  importing index {{index}}[{{global}}}", "index", n, "global", g)
+		logger.Info("  importing index {{index}}->{{global}}", "index", n, "global", glob)
 	} else {
-		logger.Info("  using local index {{index}}[{{global}}}", "index", n, "global", g)
+		logger.Info("  using local index {{index}}->{{global}}", "index", n, "global", glob)
 	}
 	if reflect.TypeOf(i.GetResource()) != reflect.TypeOf(idx.GetResource()) {
-		return nil, fmt.Errorf("index %q resource type mismatch: expected %T, but found %T", n, i.GetResource(), idx.GetResource())
+		return nil, fmt.Errorf("index %q->%q resource type mismatch: expected %T, but found %T", n, glob, i.GetResource(), idx.GetResource())
 	}
-	c := clusters.Get(i.GetTarget())
 	if c.GetEffective() != idx.GetCluster().GetEffective() {
-		return nil, fmt.Errorf("index %q cluster mismatch: expected %s[%s], but found %s", n, i.GetTarget(), c.GetEffective().GetName(), idx.GetCluster().GetEffective().GetName())
+		return nil, fmt.Errorf("index %q->%q cluster mismatch: expected %s[%s], but found %s", n, glob, i.GetTarget(), c.GetEffective().GetName(), idx.GetCluster().GetEffective().GetName())
 	}
 	local[n] = generics.Cast[I](idx.GetEffective())
 	return idx.GetEffective(), nil

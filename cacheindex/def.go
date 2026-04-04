@@ -9,7 +9,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/internal"
 	"github.com/mandelsoft/kubecrtutils/mapping"
 	"github.com/mandelsoft/kubecrtutils/types"
-	"github.com/mandelsoft/logging"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -20,7 +20,6 @@ type Reference interface {
 
 type TypedDefinition[P kubecrtutils.ObjectPointer[T], T any] interface {
 	Definition
-	TypedApply(ctx context.Context, set types.Clusters, logger logging.Logger) (TypedIndex[T], error)
 }
 
 type _definition[P kubecrtutils.ObjectPointer[T], T any] struct {
@@ -49,20 +48,6 @@ func Ref[P kubecrtutils.ObjectPointer[T], T any](name string, target string) Ref
 	}}
 }
 
-func (r *_reference[P, T]) ApplyMappings(mappings mapping.ControllerMappings) Definition {
-	if mappings == nil || mappings.IsNone() {
-		return r
-	}
-	target := mappings.ClusterMappings().Map(r.target)
-	return &_reference[P, T]{_definition[P, T]{
-		Element:                internal.NewElement(mappings.IndexMappings().Map(r.GetName())),
-		DefaultClusterConsumer: *mapping.NewDefaultClusterConsumer(target),
-		target:                 target,
-		indexerFactory:         r.indexerFactory,
-		proto:                  r.proto,
-	}}
-}
-
 func Define[P kubecrtutils.ObjectPointer[T], T any](name string, target string, idxfunc IndexerFunc[P]) TypedDefinition[P, T] {
 	return &_definition[P, T]{
 		Element:                internal.NewElement(name),
@@ -83,20 +68,6 @@ func DefineByFactory[P kubecrtutils.ObjectPointer[T], T any](name string, target
 	}
 }
 
-func (d *_definition[P, T]) ApplyMappings(mappings mapping.ControllerMappings) Definition {
-	if mappings == nil || mappings.IsNone() {
-		return d
-	}
-	target := mappings.ClusterMappings().Map(d.target)
-	return &_definition[P, T]{
-		Element:                internal.NewElement(mappings.IndexMappings().Map(d.GetName())),
-		DefaultClusterConsumer: *mapping.NewDefaultClusterConsumer(target),
-		target:                 target,
-		indexerFactory:         d.indexerFactory,
-		proto:                  d.proto,
-	}
-}
-
 func (d *_definition[P, T]) GetEffective() Definition {
 	return d
 }
@@ -113,24 +84,43 @@ func (d *_definition[P, T]) GetIndexer() IndexerFactory {
 	return d.indexerFactory
 }
 
-func (d *_definition[P, T]) Apply(ctx context.Context, set Clusters, logger logging.Logger) (types.Index, error) {
-	c := set.Get(d.GetTarget())
+func (d *_definition[P, T]) Apply(ctx context.Context, mappings mapping.ControllerMappings, mgr types.ControllerManager) error {
+	logger := mgr.GetLogger()
+	mappings = mapping.DefaultMappings(mappings)
+	clusters, err := mgr.GetClusters().Map(mappings.ClusterMappings(), d.GetClusters())
+	if err != nil {
+		return err
+	}
+	c := clusters.Get(d.target).GetEffective()
+	index := mappings.IndexMappings().Map(d.GetName())
+
 	if c == nil {
-		return nil, fmt.Errorf("cluster %q not found", d.GetTarget())
+		return fmt.Errorf("cluster %s->%s not found", d.GetTarget(), c.GetName())
 	}
 
 	gk, err := kubecrtutils.GKForObject(c, d.proto)
 	if err != nil {
-		return nil, fmt.Errorf("cannot determine group/kind for %T: %w", d.proto, err)
+		return fmt.Errorf("cannot determine group/kind for %T: %w", d.proto, err)
 	}
 	if d.GetIndexer() == nil {
-		return nil, fmt.Errorf("indexer required for %T", d.proto)
+		return fmt.Errorf("indexer required for %T", d.proto)
 	}
 
-	ilog := logger.WithName("index."+d.GetName()).WithValues("index", d.GetName())
-	f, err := d.indexerFactory(ctx, ilog, set)
+	glob := ComposeName(index, c.GetName())
+	old := mgr.GetIndex(glob)
+	if old != nil {
+		if err := Match(old, gk, c); err != nil {
+			return err
+		}
+		logger.Info("  sharing existing global index {{index}} on resource {{resource}} for {{local}}->{{global}} on {{cluster}}->{{effective}}", "index", glob, "local", d.GetName(), "cluster", d.GetTarget(), "effective", c.GetName(), "resource", gk)
+		return nil
+	}
+	logger.Info("  creating index {{local}}->{{index}} on resource {{resource}}  on {{cluster}}->{{effective}}", "index", glob, "local", d.GetName(), "cluster", d.GetTarget(), "effective", c.GetName(), "resource", gk)
+
+	ilog := logger.WithName("index."+glob).WithValues("index", glob)
+	f, err := d.indexerFactory(ctx, ilog, clusters)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	i := func(obj client.Object) []string {
 		r := f(obj)
@@ -140,9 +130,8 @@ func (d *_definition[P, T]) Apply(ctx context.Context, set Clusters, logger logg
 		return r
 	}
 
-	logger.Info("  creating index {{index}} for {{resource}} on {{cluster}}[{{effcluster}}]", "index", d.GetName(), "resource", gk, "cluster", d.GetTarget(), "effcluster", c.GetEffective().GetName())
-	idx, err := c.CreateIndex(ctx, d.GetName(), d.proto, i, func(_c ClusterEquivalent, name string) (Index, error) {
-		idx, err := NewDefaultIndex(d.GetName(), _c, d.proto)
+	idx, err := c.CreateIndex(ctx, glob, d.proto, i, func(_c ClusterEquivalent, name string) (Index, error) {
+		idx, err := NewDefaultIndex(name, _c, d.proto)
 		if err != nil {
 			return nil, err
 		}
@@ -152,15 +141,18 @@ func (d *_definition[P, T]) Apply(ctx context.Context, set Clusters, logger logg
 	})
 
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return idx, nil
+
+	return mgr.GetIndices().Add(idx)
 }
 
-func (d *_definition[P, T]) TypedApply(ctx context.Context, set Clusters, logger logging.Logger) (TypedIndex[T], error) {
-	idx, err := d.Apply(ctx, set, logger)
-	if err != nil {
-		return nil, err
+func Match(i Index, gk schema.GroupKind, c types.ClusterEquivalent) error {
+	if i.GetGVK().GroupKind() != gk {
+		return fmt.Errorf("group kind mismatch: expected %s, but found %s", gk, i.GetGVK())
 	}
-	return idx.(TypedIndex[T]), nil
+	if i.GetCluster().GetEffective() != c.GetEffective() {
+		return fmt.Errorf("cluster mismatch: expected %s->%s, but found %s", c.GetName(), c.GetEffective().GetName(), i.GetCluster().GetEffective().GetName())
+	}
+	return nil
 }

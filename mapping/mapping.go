@@ -59,6 +59,7 @@ type ControllerMappings interface {
 	IsNone() bool
 	IsClustersNone() bool
 	IsIndicesNone() bool
+	IsComponentsNone() bool
 }
 
 func DefaultMappings(mappings ControllerMappings) ControllerMappings {
@@ -95,5 +96,9 @@ func (n none) IsClustersNone() bool {
 }
 
 func (n none) IsIndicesNone() bool {
+	return true
+}
+
+func (n none) IsComponentsNone() bool {
 	return true
 }

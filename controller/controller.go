@@ -135,6 +135,8 @@ func (c *_controller[P, T]) Complete(ctx context.Context) error {
 	mgr := c.GetControllerManager()
 	logger := c.GetLogger()
 
+	Info(logger, "- complete controller {{controller}}", "controller", c.GetName())
+
 	bldr := multiclusterruntime.NewControllerManagedBy(mgr.GetManager()).Named(d.GetName())
 
 	Info(logger, "  configure reconciling of ", GroupKind(c.gk), " at ", LogicalClusterInfo(c.GetCluster()))

@@ -3,7 +3,6 @@ package component
 import (
 	"context"
 
-	"github.com/mandelsoft/kubecrtutils/cacheindex"
 	"github.com/mandelsoft/kubecrtutils/mapping"
 	"github.com/mandelsoft/kubecrtutils/types"
 )
@@ -14,7 +13,7 @@ func WithMappings(def Definition) *_mapped {
 	m := &_mapped{
 		Definition: def,
 	}
-	m.BaseMappings = mapping.NewBaseMappings(m)
+	m.Mappable = mapping.NewBaseMappings(m)
 	return m
 }
 
@@ -22,23 +21,19 @@ func WithMappings(def Definition) *_mapped {
 
 type _mapped struct {
 	Definition
-	*mapping.BaseMappings[*_mapped]
+	mapping.Mappable[*_mapped]
 }
 
 var _ Definition = (*_mapped)(nil)
 
 func (d *_mapped) GetRequiredClusters(mappings mapping.ControllerMappings) types.ClusterNames {
 	// resolve method
-	return d.BaseMappings.GetRequiredClusters(mappings)
+	return d.Mappable.GetRequiredClusters(mappings)
 }
 
 func (d *_mapped) GetRequiredComponents(mappings mapping.ControllerMappings) types.ComponentNames {
 	// resolve method
-	return d.BaseMappings.GetRequiredComponents(mappings)
-}
-
-func (d *_mapped) GetForeignIndices() cacheindex.Definitions {
-	return d.Definition.GetForeignIndices().ApplyMappings(d)
+	return d.Mappable.GetRequiredComponents(mappings)
 }
 
 func (d *_mapped) CreateIndices(ctx context.Context, mapping mapping.ControllerMappings, mgr types.ControllerManager) error {

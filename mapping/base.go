@@ -12,10 +12,29 @@ type Consumer interface {
 	// GetRequiredClusters(mappings types.ControllerMappings) ClusterNames
 }
 
-type Mappable[S any] interface {
+type BaseMappable[S Consumer] interface {
+	ControllerMappings
+
+	GetRequiredClusters(mappings ControllerMappings) ClusterNames
+	GetRequiredComponents(mappings ControllerMappings) ComponentNames
+	ApplyTo(mappings ControllerMappings) ControllerMappings
+}
+
+type ClusterMappable[S Consumer] interface {
 	MapCluster(src, tgt string) S
+}
+type IndexMappable[S Consumer] interface {
 	MapIndex(src, tgt string) S
+}
+type ComponentMappable[S Consumer] interface {
 	MapComponent(src, tgt string) S
+}
+
+type Mappable[S Consumer] interface {
+	BaseMappable[S]
+	ClusterMappable[S]
+	IndexMappable[S]
+	ComponentMappable[S]
 }
 
 type BaseMappings[S Consumer] struct {
@@ -26,8 +45,9 @@ type BaseMappings[S Consumer] struct {
 }
 
 var (
-	_ Mappable[Consumer] = (*BaseMappings[Consumer])(nil)
-	_ ControllerMappings = (*BaseMappings[Consumer])(nil)
+	_ Mappable[Consumer]     = (*BaseMappings[Consumer])(nil)
+	_ ControllerMappings     = (*BaseMappings[Consumer])(nil)
+	_ BaseMappable[Consumer] = (*BaseMappings[Consumer])(nil)
 )
 
 func NewBaseMappings[S Consumer](self S) *BaseMappings[S] {
@@ -37,6 +57,10 @@ func NewBaseMappings[S Consumer](self S) *BaseMappings[S] {
 		clusters:   Mappings{},
 		components: Mappings{},
 	}
+}
+
+func (d *BaseMappings[S]) GetSelf() S {
+	return d.self
 }
 
 func (d *BaseMappings[S]) IsNone() bool {

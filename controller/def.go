@@ -12,9 +12,7 @@ import (
 	"github.com/mandelsoft/goutils/set"
 	"github.com/mandelsoft/kubecrtutils"
 	"github.com/mandelsoft/kubecrtutils/cacheindex"
-	"github.com/mandelsoft/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubecrtutils/cluster/clustercontext"
-	"github.com/mandelsoft/kubecrtutils/component"
 	"github.com/mandelsoft/kubecrtutils/controller/builder"
 	"github.com/mandelsoft/kubecrtutils/controller/constraints"
 	"github.com/mandelsoft/kubecrtutils/internal"
@@ -259,41 +257,21 @@ func (d *_definition[P, T]) GetForeignIndices() cacheindex.Definitions {
 }
 
 func (d *_definition[P, T]) CreateIndices(ctx context.Context, m mapping.ControllerMappings, mgr types.ControllerManager) error {
-	m = mapping.DefaultMappings(m)
-	clusters, err := cluster.Map(mgr.GetClusters(), m.ClusterMappings(), d.GetClusters())
-	if err != nil {
-		return err
-	}
 	logger := mgr.GetLogger().WithName(d.GetName()).WithValues("controller", d.GetName())
-	idxmap := m.IndexMappings()
+
 	for n, i := range d.indices {
-		g := idxmap.Map(n)
-		logger.Info("- configuring index {{index}}[{{global}}] from controller {{controller}}", "index", n, "global", g, "controller", d.GetName())
-		idx, err := i.Apply(ctx, clusters, logger)
+		logger.Info("- configuring local index {{index}} from controller {{controller}}", "index", n, "controller", d.GetName())
+		err := i.Apply(ctx, m, mgr)
 		if err != nil {
-			return fmt.Errorf("index %q[%s]: %w", n, g, err)
-		}
-		logger.Info("  exporting index {{index}}[{{global}}}", "index", n, "global", g)
-		err = mgr.GetIndices().Add(cacheindex.NewAlias(g, idx))
-		if err != nil {
-			return fmt.Errorf("global index %q[%s]: %w", n, g, err)
+			return fmt.Errorf("controller %q: index %q: %w", d.GetName(), n, err)
 		}
 	}
-
-	// hmm we could add the foreign indices directly to the global index defintions.
-	// and use here simple imports instead.
 
 	for n, i := range d.foreign.Elements {
-		g := idxmap.Map(n)
-		logger.Info("- configuring foreign index {{index}}[{{global}}] from controller {{controller}}", "index", n, "global", g, "controller", d.GetName())
-		idx, err := i.Apply(ctx, clusters, logger)
+		logger.Info("- configuring foreign index {{index}} from controller {{controller}}", "index", n, "controller", d.GetName())
+		err := i.Apply(ctx, m, mgr)
 		if err != nil {
-			return fmt.Errorf("index %q[%s]: %w", n, g, err)
-		}
-		logger.Info("  exporting foreign index {{index}}[{{global}}}", "index", n, "global", g)
-		err = mgr.GetIndices().Add(cacheindex.NewAlias(g, idx))
-		if err != nil {
-			return fmt.Errorf("global index %q[%s]: %w", n, g, err)
+			return fmt.Errorf("controller %q: index %q: %w", d.GetName(), n, err)
 		}
 	}
 	return nil
@@ -301,25 +279,26 @@ func (d *_definition[P, T]) CreateIndices(ctx context.Context, m mapping.Control
 
 func registerIndex[I cacheindex.Index](logger logging.Logger, i cacheindex.Definition, clusters types.Clusters, idxmap mapping.Mappings, mgr types.ControllerManager, local map[string]I) (cacheindex.Index, error) {
 	n := i.GetName()
-	g := idxmap.Map(n)
+	c := clusters.Get(i.GetTarget()).GetEffective()
+	glob := cacheindex.ComposeName(idxmap.Map(n), c.GetName())
+
 	// import indexer
-	idx := mgr.GetIndex(g)
+	idx := mgr.GetIndex(glob)
 	if idx == nil {
-		return nil, fmt.Errorf("imported index %q[%s] not found", n, g)
+		return nil, fmt.Errorf("imported index %q->%q not found", n, glob)
 	}
 
 	f := i.GetIndexer()
 	if f == nil {
-		logger.Info("  importing index {{index}}[{{global}}}", "index", n, "global", g)
+		logger.Info("  importing index {{index}}->{{global}}", "index", n, "global", glob)
 	} else {
-		logger.Info("  using local index {{index}}[{{global}}}", "index", n, "global", g)
+		logger.Info("  using local index {{index}}->{{global}}", "index", n, "global", glob)
 	}
 	if reflect.TypeOf(i.GetResource()) != reflect.TypeOf(idx.GetResource()) {
-		return nil, fmt.Errorf("index %q resource type mismatch: expected %T, but found %T", n, i.GetResource(), idx.GetResource())
+		return nil, fmt.Errorf("index %q->%g resource type mismatch: expected %T, but found %T", n, glob, i.GetResource(), idx.GetResource())
 	}
-	c := clusters.Get(i.GetTarget())
-	if c.GetEffective() != idx.GetCluster().GetEffective() {
-		return nil, fmt.Errorf("index %q cluster mismatch: expected %s[%s], but found %s", n, i.GetTarget(), c.GetEffective().GetName(), idx.GetCluster().GetEffective().GetName())
+	if c != idx.GetCluster().GetEffective() {
+		return nil, fmt.Errorf("index %q->%q cluster mismatch: expected %s[%s], but found %s", n, glob, i.GetTarget(), c.GetEffective().GetName(), idx.GetCluster().GetEffective().GetName())
 	}
 	local[n] = generics.Cast[I](idx.GetEffective())
 	return idx.GetEffective(), nil
@@ -333,12 +312,12 @@ func (d *_definition[P, T]) Apply(ctx context.Context, m mapping.ControllerMappi
 	logger := mgr.GetLogger().WithName(d.GetName()).WithValues("controller", d.GetName())
 	logger.Info("- configure controller {{controller}}")
 
-	comps, err := component.Map(mgr.GetComponents(), m.ComponentMappings(), d.GetComponents())
+	comps, err := mgr.GetComponents().Map(m.ComponentMappings(), d.GetComponents())
 	if err != nil {
 		return nil, err
 	}
 
-	clusters, err := cluster.Map(mgr.GetClusters(), m.ClusterMappings(), d.GetClusters())
+	clusters, err := mgr.GetClusters().Map(m.ClusterMappings(), d.GetClusters())
 	if err != nil {
 		return nil, err
 	}

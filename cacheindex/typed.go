@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/mandelsoft/goutils/generics"
 	"github.com/mandelsoft/kubecrtutils/internal"
 	"github.com/mandelsoft/kubecrtutils/types"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -16,6 +17,14 @@ type TypedIndices[T any] interface {
 
 func NewTypedIndices[T any](name string) TypedIndices[T] {
 	return internal.NewGroup[TypedIndex[T]](name)
+}
+
+func GetTypedIndex[T any](indices Indices, name string) TypedIndex[T] {
+	i := indices.Get(name)
+	if i == nil {
+		return nil
+	}
+	return generics.Cast[TypedIndex[T]](i.GetEffective())
 }
 
 type TypedIndex[T any] interface {

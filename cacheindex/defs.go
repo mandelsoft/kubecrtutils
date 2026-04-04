@@ -6,9 +6,7 @@ import (
 
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/kubecrtutils/internal"
-	"github.com/mandelsoft/kubecrtutils/mapping"
 	"github.com/mandelsoft/kubecrtutils/types"
-	"github.com/mandelsoft/logging"
 )
 
 func From(opts flagutils.OptionSetProvider) Definitions {
@@ -27,29 +25,22 @@ func NewDefinitions() Definitions {
 	return d
 }
 
-// GetIndices creates the indices for not disabled clusters.
-func (d *_definitions) GetIndices(ctx context.Context, clusters Clusters, logger logging.Logger) (Indices, error) {
+// CreateIndices creates the indices for not disabled clusters.
+func (d *_definitions) CreateIndices(ctx context.Context, mgr types.ControllerManager) error {
 	if d.GetError() != nil {
-		return nil, d.GetError()
+		return d.GetError()
 	}
-	indices := NewIndices()
+
+	clusters := mgr.GetClusters()
+
 	for n, i := range d.Elements {
 		if clusters.IsDisabled(i.GetTarget()) {
 			continue
 		}
-		idx, err := i.Apply(ctx, clusters, logger)
+		err := i.Apply(ctx, nil, mgr)
 		if err != nil {
-			return nil, fmt.Errorf("index %q: %w", n, err)
+			return fmt.Errorf("index %q: %w", n, err)
 		}
-		indices.Add(idx)
 	}
-	return indices, nil
-}
-
-func (d *_definitions) ApplyMappings(mappings mapping.ControllerMappings) Definitions {
-	defs := NewDefinitions()
-	for _, e := range d.Elements {
-		defs.Add(e.ApplyMappings(mappings))
-	}
-	return defs
+	return nil
 }

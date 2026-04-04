@@ -25,7 +25,7 @@ type definitions struct {
 	internal.DefinitionsImpl[Definition, Definitions]
 	scheme   *runtime.Scheme
 	main     Definition
-	clusters *clusters
+	clusters *_clusters
 }
 
 var _ Definitions = (*definitions)(nil)

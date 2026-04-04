@@ -30,7 +30,7 @@ type Definitions interface {
 	flagutils.Validatable
 
 	CreateIndices(ctx context.Context, mgr types.ControllerManager) error
-	Apply(ctx context.Context, mgr types.ControllerManager) (Components, error)
+	Apply(ctx context.Context, mgr types.ControllerManager) error
 }
 
 type _definitions struct {
@@ -124,10 +124,9 @@ func (d *_definitions) CreateIndices(ctx context.Context, mgr types.ControllerMa
 	return nil
 }
 
-func (d *_definitions) Apply(ctx context.Context, mgr types.ControllerManager) (Components, error) {
+func (d *_definitions) Apply(ctx context.Context, mgr types.ControllerManager) error {
 	mgr.GetLogger().Info("configure components...")
 
-	comps := NewComponents()
 	for n, c := range d.Elements {
 		if ok, err := d.isUsed(c); !ok || err != nil {
 			continue
@@ -135,16 +134,16 @@ func (d *_definitions) Apply(ctx context.Context, mgr types.ControllerManager) (
 
 		comp, err := c.Apply(ctx, nil, mgr)
 		if err != nil {
-			return nil, fmt.Errorf("component %q: %w", n, err)
+			return fmt.Errorf("component %q: %w", n, err)
 		}
-		err = comps.Add(comp)
+		err = mgr.GetComponents().Add(comp)
 		if err != nil {
-			return nil, fmt.Errorf("component %q: %w", n, err)
+			return fmt.Errorf("component %q: %w", n, err)
 		}
 		if r, ok := comp.(manager.Runnable); ok {
 			mgr.GetLogger().Info("  register as runnable")
 			mgr.GetManager().GetLocalManager().Add(r)
 		}
 	}
-	return comps, nil
+	return nil
 }

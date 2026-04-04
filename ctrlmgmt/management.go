@@ -87,26 +87,24 @@ func NewControllerManagerByOpts(ctx context.Context, opts flagutils.OptionSetPro
 		return nil, fmt.Errorf("no controller definitions found")
 	}
 
-	var indices cacheindex.Indices
-	iopts := cacheindex.From(opts)
-	if iopts != nil && iopts.Len() > 0 {
-		logger.Info("configure global indices...")
-		indices, err = iopts.GetIndices(ctx, clusters, logger)
-		if err != nil {
-			return nil, fmt.Errorf("settingup indices: %w", err)
-		}
-	} else {
-		indices = cacheindex.NewIndices()
-	}
-
 	cm := &_controllermanager{
 		Element:    internal.NewElement(def.GetName()),
 		logger:     logger,
 		clusters:   clusters,
 		manager:    mcmgr,
 		main:       main.AsCluster(),
-		indices:    indices,
+		indices:    cacheindex.NewIndices(),
+		components: component.NewComponents(),
 		definition: def,
+	}
+
+	iopts := cacheindex.From(opts)
+	if iopts != nil && iopts.Len() > 0 {
+		logger.Info("configure global indices...")
+		err = iopts.CreateIndices(ctx, cm)
+		if err != nil {
+			return nil, fmt.Errorf("settingup indices: %w", err)
+		}
 	}
 
 	coopts := component.From(opts)
@@ -127,7 +125,7 @@ func NewControllerManagerByOpts(ctx context.Context, opts flagutils.OptionSetPro
 	}
 
 	if coopts != nil && coopts.Len() > 0 {
-		cm.components, err = coopts.Apply(ctx, cm)
+		err = coopts.Apply(ctx, cm)
 		if err != nil {
 			return nil, fmt.Errorf("setting up components: %w", err)
 		}

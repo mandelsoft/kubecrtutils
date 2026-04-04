@@ -6,7 +6,6 @@ import (
 	"github.com/mandelsoft/kubecrtutils/internal"
 	"github.com/mandelsoft/kubecrtutils/mapping"
 	"github.com/mandelsoft/kubecrtutils/types/plain"
-	"github.com/mandelsoft/logging"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -35,18 +34,17 @@ type Indices interface {
 type IndexerFactory = ClustersAware[client.IndexerFunc]
 
 type IndexDefinition interface {
+	mapping.Consumer
 	GetName() string
 	GetTarget() string
 	GetResource() client.Object
 	GetIndexer() IndexerFactory
 	GetEffective() IndexDefinition
-	ApplyMappings(mappings mapping.ControllerMappings) IndexDefinition
-	Apply(ctx context.Context, set Clusters, logger logging.Logger) (Index, error)
+	Apply(ctx context.Context, mappings mapping.ControllerMappings, mgr ControllerManager) error
 }
 
 type IndexDefinitions interface {
 	internal.Definitions[IndexDefinition, IndexDefinitions]
-	ApplyMappings(mappings mapping.ControllerMappings) IndexDefinitions
 
-	GetIndices(ctx context.Context, clusters Clusters, logger logging.Logger) (Indices, error)
+	CreateIndices(ctx context.Context, mgr ControllerManager) error
 }

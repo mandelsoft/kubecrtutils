@@ -40,3 +40,7 @@ func (c *Base) GetComponent(name string) Component {
 func (c *Base) GetIndex(name string) cacheindex.Index {
 	return c.indices.Get(name)
 }
+
+func (c *Base) GetIndices() cacheindex.Indices {
+	return c.indices
+}

@@ -8,6 +8,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/cluster/config"
 	"github.com/mandelsoft/kubecrtutils/enqueue"
 	"github.com/mandelsoft/kubecrtutils/internal"
+	"github.com/mandelsoft/kubecrtutils/mapping"
 	"github.com/mandelsoft/kubecrtutils/merge"
 	"github.com/mandelsoft/kubecrtutils/types/plain"
 	"github.com/mandelsoft/logging"
@@ -160,4 +161,6 @@ type Clusters interface {
 	IsMulti() bool
 	GetClusterById(clusterId string) ClusterEquivalent
 	IsDisabled(name string) bool
+
+	Map(mapping mapping.Mappings, names ClusterNames) (Clusters, error)
 }

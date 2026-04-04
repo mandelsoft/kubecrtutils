@@ -8,23 +8,23 @@ import (
 
 ////////////////////////////////////////////////////////////////////////////////
 
-type clusters struct {
+type _clusters struct {
 	internal.Group[ClusterEquivalent]
 	multi    bool
 	disabled set.Set[string]
 }
 
-var _ Clusters = (*clusters)(nil)
+var _ Clusters = (*_clusters)(nil)
 
 func NewClusters() Clusters {
 	return newClusters()
 }
 
-func newClusters() *clusters {
-	return &clusters{Group: internal.NewGroup[ClusterEquivalent]("cluster"), disabled: set.New[string]()}
+func newClusters() *_clusters {
+	return &_clusters{Group: internal.NewGroup[ClusterEquivalent]("cluster"), disabled: set.New[string]()}
 }
 
-func (c *clusters) Get(name string) ClusterEquivalent {
+func (c *_clusters) Get(name string) ClusterEquivalent {
 	b, n := fpi.Split(name)
 	if b == "" {
 		return c.Group.Get(n)
@@ -39,11 +39,11 @@ func (c *clusters) Get(name string) ClusterEquivalent {
 	return f.AsFleet().GetClusterByLocalName(n)
 }
 
-func (c *clusters) IsDisabled(name string) bool {
+func (c *_clusters) IsDisabled(name string) bool {
 	return c.disabled.Has(name)
 }
 
-func (c *clusters) GetClusterById(id string) ClusterEquivalent {
+func (c *_clusters) GetClusterById(id string) ClusterEquivalent {
 	for _, cl := range c.Elements {
 		if cl.GetId() == id {
 			return cl
@@ -59,7 +59,7 @@ func (c *clusters) GetClusterById(id string) ClusterEquivalent {
 	return nil
 }
 
-func (c *clusters) Add(elems ...ClusterEquivalent) error {
+func (c *_clusters) Add(elems ...ClusterEquivalent) error {
 	err := c.Group.Add(elems...)
 	if err != nil {
 		return err
@@ -77,6 +77,6 @@ func (c *clusters) Add(elems ...ClusterEquivalent) error {
 	return nil
 }
 
-func (c *clusters) IsMulti() bool {
+func (c *_clusters) IsMulti() bool {
 	return c.multi
 }

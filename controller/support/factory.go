@@ -90,7 +90,7 @@ func (f *ReconcilerFactory[O, S, P, T]) CreateReconciler(ctx context.Context, co
 		Settings: set,
 		request:  f.reqfactory,
 	}
-	r.Info("using main {{ctype}} {{cluster}}[{{info}}]", "ctype", controller.GetCluster().GetTypeInfo(), "cluster", controller.GetCluster().GetName(), "info", controller.GetCluster().GetInfo())
+	r.Info("  using main {{ctype}} {{cluster}}[{{info}}]", "ctype", controller.GetCluster().GetTypeInfo(), "cluster", controller.GetCluster().GetName(), "info", controller.GetCluster().GetInfo())
 	return reconciler.CRTReconcilerFor[P](controller, r, 0), nil
 }
 
