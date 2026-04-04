@@ -186,7 +186,7 @@ func (d *_definitions) Apply(ctx context.Context, mgr types.ControllerManager) (
 		if !d.filter.Use(n) {
 			continue
 		}
-		c, err := i.CreateController(ctx, nil, mgr)
+		c, err := i.Apply(ctx, nil, mgr)
 		if err != nil {
 			return nil, fmt.Errorf("controller %q: %w", n, err)
 		}

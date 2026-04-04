@@ -3,10 +3,10 @@ package cluster
 import (
 	"fmt"
 
-	"github.com/mandelsoft/kubecrtutils/types"
+	"github.com/mandelsoft/kubecrtutils/mapping"
 )
 
-func Map(clusters Clusters, mapping types.Mappings, names ClusterNames) (Clusters, error) {
+func Map(clusters Clusters, mapping mapping.Mappings, names ClusterNames) (Clusters, error) {
 	n := NewClusters()
 
 	for local := range names {

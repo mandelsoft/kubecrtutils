@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/mandelsoft/goutils/transformer"
+	"github.com/mandelsoft/kubecrtutils/mapping"
 	"github.com/mandelsoft/kubecrtutils/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -62,7 +63,7 @@ func CompleteRequest[R mcreconcile.ClusterAware[R]](clusterName string) transfor
 	}
 }
 
-func CompleteRequestWithMappings[R mcreconcile.ClusterAware[R]](mappings types.Mappings) func(clusterName string) transformer.Transformer[R, R] {
+func CompleteRequestWithMappings[R mcreconcile.ClusterAware[R]](mappings mapping.Mappings) func(clusterName string) transformer.Transformer[R, R] {
 	return func(clusterName string) transformer.Transformer[R, R] {
 		return func(request R) R {
 			if request.Cluster() != "" {

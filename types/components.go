@@ -2,9 +2,10 @@ package types
 
 import (
 	"github.com/mandelsoft/kubecrtutils/internal"
+	"github.com/mandelsoft/kubecrtutils/types/plain"
 )
 
-type ComponentNames = NameSet
+type ComponentNames = plain.ComponentNames
 
 type ComponentFilter interface {
 	GetUsedComponents(ConstraintContext) ComponentNames
@@ -12,6 +13,7 @@ type ComponentFilter interface {
 
 type Component interface {
 	GetName() string
+	GetEffective() Component
 }
 
 type Components interface {

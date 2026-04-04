@@ -18,6 +18,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/controller/builder"
 	"github.com/mandelsoft/kubecrtutils/controller/constraints"
 	"github.com/mandelsoft/kubecrtutils/internal"
+	"github.com/mandelsoft/kubecrtutils/mapping"
 	"github.com/mandelsoft/kubecrtutils/owner"
 	"github.com/mandelsoft/kubecrtutils/types"
 	"github.com/mandelsoft/logging"
@@ -243,18 +244,18 @@ func (d *_definition[P, T]) GetActivationConstraints() constraints.Constraints {
 	return d.constraints.Clone()
 }
 
-func (d *_definition[P, T]) GetRequiredClusters(mappings types.ControllerMappings) ClusterNames {
+func (d *_definition[P, T]) GetRequiredClusters(mappings mapping.ControllerMappings) ClusterNames {
 	names := set.New[string]()
-	m := types.DefaultMappings(mappings).ClusterMappings()
+	m := mapping.DefaultMappings(mappings).ClusterMappings()
 	for n := range d.GetClusters() {
 		names.Add(m.Map(n))
 	}
 	return names
 }
 
-func (d *_definition[P, T]) GetRequiredComponents(mappings types.ControllerMappings) component.ComponentNames {
+func (d *_definition[P, T]) GetRequiredComponents(mappings mapping.ControllerMappings) component.ComponentNames {
 	names := set.New[string]()
-	m := types.DefaultMappings(mappings).ComponentMappings()
+	m := mapping.DefaultMappings(mappings).ComponentMappings()
 	for n := range d.GetComponents() {
 		names.Add(m.Map(n))
 	}
@@ -285,14 +286,14 @@ func (d *_definition[P, T]) GetForeignIndices() cacheindex.Definitions {
 	return d.foreign
 }
 
-func (d *_definition[P, T]) CreateIndices(ctx context.Context, mapping types.ControllerMappings, mgr types.ControllerManager) error {
-	mapping = types.DefaultMappings(mapping)
-	clusters, err := cluster.Map(mgr.GetClusters(), mapping.ClusterMappings(), d.GetClusters())
+func (d *_definition[P, T]) CreateIndices(ctx context.Context, m mapping.ControllerMappings, mgr types.ControllerManager) error {
+	m = mapping.DefaultMappings(m)
+	clusters, err := cluster.Map(mgr.GetClusters(), m.ClusterMappings(), d.GetClusters())
 	if err != nil {
 		return err
 	}
 	logger := mgr.GetLogger().WithName(d.GetName()).WithValues("controller", d.GetName())
-	idxmap := mapping.IndexMappings()
+	idxmap := m.IndexMappings()
 	for n, i := range d.indices {
 		g := idxmap.Map(n)
 		logger.Info("- configuring index {{index}}[{{global}}] from controller {{controller}}", "index", n, "global", g, "controller", d.GetName())
@@ -326,7 +327,7 @@ func (d *_definition[P, T]) CreateIndices(ctx context.Context, mapping types.Con
 	return nil
 }
 
-func registerIndex[I cacheindex.Index](logger logging.Logger, i cacheindex.Definition, clusters types.Clusters, idxmap types.Mappings, mgr types.ControllerManager, local map[string]I) (cacheindex.Index, error) {
+func registerIndex[I cacheindex.Index](logger logging.Logger, i cacheindex.Definition, clusters types.Clusters, idxmap mapping.Mappings, mgr types.ControllerManager, local map[string]I) (cacheindex.Index, error) {
 	n := i.GetName()
 	g := idxmap.Map(n)
 	// import indexer
@@ -352,11 +353,11 @@ func registerIndex[I cacheindex.Index](logger logging.Logger, i cacheindex.Defin
 	return idx.GetEffective(), nil
 }
 
-func (d *_definition[P, T]) CreateController(ctx context.Context, mapping types.ControllerMappings, mgr types.ControllerManager) (types.Controller, error) {
+func (d *_definition[P, T]) Apply(ctx context.Context, m mapping.ControllerMappings, mgr types.ControllerManager) (types.Controller, error) {
 	if d.GetError() != nil {
 		return nil, d.GetError()
 	}
-	mapping = types.DefaultMappings(mapping)
+	m = mapping.DefaultMappings(m)
 	logger := mgr.GetLogger().WithName(d.GetName()).WithValues("controller", d.GetName())
 	logger.Info("- configure controller {{controller}}")
 
@@ -370,7 +371,7 @@ func (d *_definition[P, T]) CreateController(ctx context.Context, mapping types.
 		}
 	}
 
-	clusters, err := cluster.Map(mgr.GetClusters(), mapping.ClusterMappings(), d.GetClusters())
+	clusters, err := cluster.Map(mgr.GetClusters(), m.ClusterMappings(), d.GetClusters())
 	if err != nil {
 		return nil, err
 	}
@@ -388,7 +389,7 @@ func (d *_definition[P, T]) CreateController(ctx context.Context, mapping types.
 
 	local := map[string]cacheindex.TypedIndex[T]{}
 	all := map[string]cacheindex.Index{}
-	idxmap := mapping.IndexMappings()
+	idxmap := m.IndexMappings()
 	for n, i := range d.indices {
 		idx, err := registerIndex(logger, i, clusters, idxmap, mgr, local)
 		if err != nil {
@@ -430,7 +431,7 @@ func (d *_definition[P, T]) CreateController(ctx context.Context, mapping types.
 	controller := &_controller[P, T]{
 		controllerManager: mgr,
 		logger:            logger,
-		mappings:          mapping.ClusterMappings(),
+		mappings:          m.ClusterMappings(),
 		components:        components,
 		clusters:          clusters,
 		cluster:           c,

@@ -15,6 +15,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubecrtutils/controller/constraints"
 	"github.com/mandelsoft/kubecrtutils/internal"
+	"github.com/mandelsoft/kubecrtutils/mapping"
 	"github.com/mandelsoft/kubecrtutils/types"
 	"github.com/mandelsoft/logging"
 	"github.com/spf13/pflag"
@@ -26,18 +27,18 @@ type Factory interface {
 
 type Definition = interface {
 	flagutils.Options
-	GetName() string
+	mapping.Consumer
 
-	GetComponents() ComponentNames
+	GetName() string
 
 	GetForeignIndices() cacheindex.Definitions
 	GetActivationConstraints() constraints.Constraints
 
-	GetRequiredClusters(mappings types.ControllerMappings) types.ClusterNames
-	GetRequiredComponents(mappings types.ControllerMappings) ComponentNames
+	GetRequiredClusters(mappings mapping.ControllerMappings) types.ClusterNames
+	GetRequiredComponents(mappings mapping.ControllerMappings) ComponentNames
 
-	CreateIndices(ctx context.Context, mapping types.ControllerMappings, mgr types.ControllerManager) error
-	CreateComponent(ctx context.Context, mapping types.ControllerMappings, mgr types.ControllerManager) (Component, error)
+	CreateIndices(ctx context.Context, mapping mapping.ControllerMappings, mgr types.ControllerManager) error
+	Apply(ctx context.Context, mapping mapping.ControllerMappings, mgr types.ControllerManager) (Component, error)
 }
 
 type _definition struct {
@@ -109,18 +110,18 @@ func (d *_definition) GetActivationConstraints() constraints.Constraints {
 	return d.constraints.Clone()
 }
 
-func (d *_definition) GetRequiredClusters(mappings types.ControllerMappings) types.ClusterNames {
+func (d *_definition) GetRequiredClusters(mappings mapping.ControllerMappings) types.ClusterNames {
 	names := set.New[string]()
-	m := types.DefaultMappings(mappings).ClusterMappings()
+	m := mapping.DefaultMappings(mappings).ClusterMappings()
 	for n := range d.GetClusters() {
 		names.Add(m.Map(n))
 	}
 	return names
 }
 
-func (d *_definition) GetRequiredComponents(mappings types.ControllerMappings) types.ComponentNames {
+func (d *_definition) GetRequiredComponents(mappings mapping.ControllerMappings) types.ComponentNames {
 	names := set.New[string]()
-	m := types.DefaultMappings(mappings).ComponentMappings()
+	m := mapping.DefaultMappings(mappings).ComponentMappings()
 	for n := range d.GetComponents() {
 		names.Add(m.Map(n))
 	}
@@ -166,14 +167,14 @@ func (d *_definition) Finalize(ctx context.Context, opts flagutils.OptionSet, v 
 	return v.FinalizeSet(ctx, opts, d.AsOptionSet())
 }
 
-func (d *_definition) CreateIndices(ctx context.Context, mapping types.ControllerMappings, mgr types.ControllerManager) error {
-	mapping = types.DefaultMappings(mapping)
-	clusters, err := cluster.Map(mgr.GetClusters(), mapping.ClusterMappings(), d.GetClusters())
+func (d *_definition) CreateIndices(ctx context.Context, m mapping.ControllerMappings, mgr types.ControllerManager) error {
+	m = mapping.DefaultMappings(m)
+	clusters, err := cluster.Map(mgr.GetClusters(), m.ClusterMappings(), d.GetClusters())
 	if err != nil {
 		return err
 	}
 	logger := mgr.GetLogger().WithName(d.GetName()).WithValues("component", d.GetName())
-	idxmap := mapping.IndexMappings()
+	idxmap := m.IndexMappings()
 
 	// hmm we could add the foreign indices directly to the global index definitions.
 	// and use here simple imports instead.
@@ -195,18 +196,18 @@ func (d *_definition) CreateIndices(ctx context.Context, mapping types.Controlle
 	return nil
 }
 
-func (d *_definition) CreateComponent(ctx context.Context, mapping types.ControllerMappings, mgr types.ControllerManager) (Component, error) {
+func (d *_definition) Apply(ctx context.Context, m mapping.ControllerMappings, mgr types.ControllerManager) (Component, error) {
 	logger := mgr.GetLogger().WithName(d.GetName()).WithValues("component", d.GetName())
 	logger.Info("- configure component {{controller}}")
 
-	mapping = types.DefaultMappings(mapping)
-	clusters, err := cluster.Map(mgr.GetClusters(), mapping.ClusterMappings(), d.GetClusters())
+	m = mapping.DefaultMappings(m)
+	clusters, err := cluster.Map(mgr.GetClusters(), m.ClusterMappings(), d.GetClusters())
 	if err != nil {
 		return nil, err
 	}
 
 	all := map[string]cacheindex.Index{}
-	idxmap := mapping.IndexMappings()
+	idxmap := m.IndexMappings()
 	for _, i := range d.foreign.Elements {
 		_, err := registerIndex(logger, i, clusters, idxmap, mgr, all)
 		if err != nil {
@@ -225,7 +226,7 @@ func (d *_definition) CreateComponent(ctx context.Context, mapping types.Control
 	return d.factory.Apply(ctx, d, clusters, indices, logger)
 }
 
-func registerIndex[I cacheindex.Index](logger logging.Logger, i cacheindex.Definition, clusters types.Clusters, idxmap types.Mappings, mgr types.ControllerManager, local map[string]I) (cacheindex.Index, error) {
+func registerIndex[I cacheindex.Index](logger logging.Logger, i cacheindex.Definition, clusters types.Clusters, idxmap mapping.Mappings, mgr types.ControllerManager, local map[string]I) (cacheindex.Index, error) {
 	n := i.GetName()
 	g := idxmap.Map(n)
 	// import indexer

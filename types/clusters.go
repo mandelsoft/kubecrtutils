@@ -9,6 +9,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/enqueue"
 	"github.com/mandelsoft/kubecrtutils/internal"
 	"github.com/mandelsoft/kubecrtutils/merge"
+	"github.com/mandelsoft/kubecrtutils/types/plain"
 	"github.com/mandelsoft/logging"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -17,7 +18,7 @@ import (
 	mcreconcile "sigs.k8s.io/multicluster-runtime/pkg/reconcile"
 )
 
-type ClusterNames = NameSet
+type ClusterNames = plain.ClusterNames
 
 type ClusterDefinitionProvider interface {
 	GetDefinition() ClusterDefinition

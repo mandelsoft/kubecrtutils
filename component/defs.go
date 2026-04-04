@@ -133,7 +133,7 @@ func (d *_definitions) Apply(ctx context.Context, mgr types.ControllerManager) (
 			continue
 		}
 
-		comp, err := c.CreateComponent(ctx, nil, mgr)
+		comp, err := c.Apply(ctx, nil, mgr)
 		if err != nil {
 			return nil, fmt.Errorf("component %q: %w", n, err)
 		}

@@ -5,6 +5,8 @@ import (
 
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/kubecrtutils/internal"
+	"github.com/mandelsoft/kubecrtutils/mapping"
+	"github.com/mandelsoft/kubecrtutils/types/plain"
 	"github.com/mandelsoft/logging"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -12,7 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-type ControllerNames = NameSet
+type ControllerNames = plain.ControllerNames
 
 type ControllerSet interface {
 	GetNames() []string
@@ -39,18 +41,18 @@ type ControllerDefinition interface {
 
 	GetForeignIndices() IndexDefinitions
 
-	GetRequiredClusters(mappings ControllerMappings) ClusterNames
-	GetRequiredComponents(mappings ControllerMappings) ComponentNames
+	GetRequiredClusters(mappings mapping.ControllerMappings) ClusterNames
+	GetRequiredComponents(mappings mapping.ControllerMappings) ComponentNames
 
 	GetError() error
 	GetOptions() flagutils.Options
 
 	// CreateIndices creates and exports locally defined indices prior to controller creation.
-	CreateIndices(ctx context.Context, mapping ControllerMappings, mgr ControllerManager) error
+	CreateIndices(ctx context.Context, mapping mapping.ControllerMappings, mgr ControllerManager) error
 
 	// CreateController handles the global definitions and provides
 	// a Controller
-	CreateController(ctx context.Context, mapping ControllerMappings, mgr ControllerManager) (Controller, error)
+	Apply(ctx context.Context, mapping mapping.ControllerMappings, mgr ControllerManager) (Controller, error)
 }
 
 type ControllerDefinitions interface {
@@ -73,7 +75,7 @@ type Controller interface {
 	GetFieldManager() string
 	GetFinalizer() string
 	GetLogger() logging.Logger
-	GetClusterMappings() Mappings
+	GetClusterMappings() mapping.Mappings
 	GetClusters() Clusters
 	GetComponents() Components
 	GetCluster() ClusterEquivalent

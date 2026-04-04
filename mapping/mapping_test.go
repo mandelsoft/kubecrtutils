@@ -1,12 +1,13 @@
-package types_test
+package mapping_test
 
 import (
-	"github.com/mandelsoft/kubecrtutils/types"
+	"github.com/mandelsoft/kubecrtutils/mapping"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
-var MA = types.Mappings{
+var MA = mapping.Mappings{
 	"inner": "outer",
 	"in":    "out",
 }
@@ -20,7 +21,7 @@ var _ = Describe("Mapping Test Environment", func() {
 
 		It("composition", func() {
 
-			orig := types.Mappings{
+			orig := mapping.Mappings{
 				"outer": "cli",
 			}
 

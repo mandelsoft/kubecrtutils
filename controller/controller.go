@@ -12,6 +12,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/cluster/clustercontext"
 	abuilder "github.com/mandelsoft/kubecrtutils/controller/builder"
 	. "github.com/mandelsoft/kubecrtutils/log"
+	"github.com/mandelsoft/kubecrtutils/mapping"
 	"github.com/mandelsoft/kubecrtutils/objutils"
 	"github.com/mandelsoft/kubecrtutils/owner"
 	"github.com/mandelsoft/kubecrtutils/types"
@@ -41,7 +42,7 @@ type _controller[P kubecrtutils.ObjectPointer[T], T any] struct {
 	controllerManager    types.ControllerManager
 	definition           TypedDefinition[P, T]
 	logger               logging.Logger
-	mappings             types.Mappings // cluster mappings
+	mappings             mapping.Mappings // cluster mappings
 	components           types.Components
 	clusters             types.Clusters
 	cluster              types.ClusterEquivalent
@@ -82,7 +83,7 @@ func (c *_controller[P, T]) GetControllerManager() types.ControllerManager {
 	return c.controllerManager
 }
 
-func (c *_controller[P, T]) GetClusterMappings() types.Mappings {
+func (c *_controller[P, T]) GetClusterMappings() mapping.Mappings {
 	return c.mappings
 }
 

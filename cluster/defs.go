@@ -3,10 +3,12 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/kubecrtutils/cluster/config"
 	"github.com/mandelsoft/kubecrtutils/internal"
+	"github.com/mandelsoft/kubecrtutils/setup"
 	"github.com/mandelsoft/kubecrtutils/types"
 	"github.com/mandelsoft/kubecrtutils/utils"
 	"github.com/spf13/pflag"
@@ -61,6 +63,7 @@ func (d *definitions) Validate(ctx context.Context, opts flagutils.OptionSet, v 
 	// don't establish validation dependencies, just access some metadata.
 	required := utils.GetUsed[ClusterFilter, ClusterNames](opts)
 
+	setup.Log.Info("effective required clusters: {{list}}", "list", strings.Join(required.AsArray(), ","))
 	if len(required) == 0 {
 		required.Add(d.GetNames()...)
 	}
@@ -107,7 +110,10 @@ func (d *definitions) Validate(ctx context.Context, opts flagutils.OptionSet, v 
 					d.clusters.Add(NewAlias(n, eff))
 					found = true
 				} else {
-					intermediate.Add(fb)
+					if !intermediate.Contains(fb) && !required.Contains(fb) {
+						intermediate.Add(fb)
+						found = true
+					}
 					if fb == DEFAULT {
 						err := v.Validate(ctx, opts, d.main)
 						if err != nil {
@@ -130,9 +136,10 @@ func (d *definitions) Validate(ctx context.Context, opts flagutils.OptionSet, v 
 		}
 		if missing {
 			for n, _ := range d.Elements {
-				if d.clusters.Get(n) == nil {
-					return d.AddError(fmt.Errorf("kubeconfig required"), "cluster ", n)
+				if d.clusters.Get(n) != nil || !(required.Contains(n) || intermediate.Contains(n)) {
+					continue
 				}
+				return d.AddError(fmt.Errorf("kubeconfig required"), "cluster ", n)
 			}
 		}
 
@@ -141,6 +148,9 @@ func (d *definitions) Validate(ctx context.Context, opts flagutils.OptionSet, v 
 				d.clusters.disabled.Add(n)
 			}
 		}
+		setup.Log.Info("  using additional intermediate defintions: {{list}}", "list", strings.Join(intermediate.AsArray(), ","))
+		setup.Log.Info("  unused defintions: {{list}}", "list", strings.Join(d.clusters.disabled.AsArray(), ","))
+
 	}
 	return d.GetError()
 }

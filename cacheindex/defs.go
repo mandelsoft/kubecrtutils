@@ -6,6 +6,7 @@ import (
 
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/kubecrtutils/internal"
+	"github.com/mandelsoft/kubecrtutils/mapping"
 	"github.com/mandelsoft/kubecrtutils/types"
 	"github.com/mandelsoft/logging"
 )
@@ -45,7 +46,7 @@ func (d *_definitions) GetIndices(ctx context.Context, clusters Clusters, logger
 	return indices, nil
 }
 
-func (d *_definitions) ApplyMappings(mappings types.ControllerMappings) Definitions {
+func (d *_definitions) ApplyMappings(mappings mapping.ControllerMappings) Definitions {
 	defs := NewDefinitions()
 	for _, e := range d.Elements {
 		defs.Add(e.ApplyMappings(mappings))

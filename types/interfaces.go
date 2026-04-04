@@ -3,14 +3,14 @@ package types
 import (
 	"context"
 
-	"github.com/mandelsoft/goutils/set"
+	"github.com/mandelsoft/kubecrtutils/types/plain"
 	"github.com/mandelsoft/logging"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/cluster"
 )
 
-type NameSet = set.Set[string]
+type NameSet = plain.NameSet
 
 type DefinitionProvider[D any] interface {
 	GetDefinition() D

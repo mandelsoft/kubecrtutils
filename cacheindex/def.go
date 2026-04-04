@@ -7,6 +7,7 @@ import (
 	"github.com/mandelsoft/goutils/generics"
 	"github.com/mandelsoft/kubecrtutils"
 	"github.com/mandelsoft/kubecrtutils/internal"
+	"github.com/mandelsoft/kubecrtutils/mapping"
 	"github.com/mandelsoft/kubecrtutils/types"
 	"github.com/mandelsoft/logging"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -46,7 +47,7 @@ func Ref[P kubecrtutils.ObjectPointer[T], T any](name string, target string) Ref
 	}}
 }
 
-func (r *_reference[P, T]) ApplyMappings(mappings types.ControllerMappings) Definition {
+func (r *_reference[P, T]) ApplyMappings(mappings mapping.ControllerMappings) Definition {
 	if mappings == nil || mappings.IsNone() {
 		return r
 	}
@@ -76,7 +77,7 @@ func DefineByFactory[P kubecrtutils.ObjectPointer[T], T any](name string, target
 	}
 }
 
-func (d *_definition[P, T]) ApplyMappings(mappings types.ControllerMappings) Definition {
+func (d *_definition[P, T]) ApplyMappings(mappings mapping.ControllerMappings) Definition {
 	if mappings == nil || mappings.IsNone() {
 		return d
 	}

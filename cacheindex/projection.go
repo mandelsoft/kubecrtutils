@@ -4,12 +4,12 @@ import (
 	"fmt"
 
 	"github.com/mandelsoft/goutils/set"
-	"github.com/mandelsoft/kubecrtutils/types"
+	"github.com/mandelsoft/kubecrtutils/mapping"
 )
 
 type IndexNames = set.Set[string]
 
-func Map(indices Indices, mapping types.Mappings, names IndexNames) (Indices, error) {
+func Map(indices Indices, mapping mapping.Mappings, names IndexNames) (Indices, error) {
 	n := NewIndices()
 
 	for local := range names {

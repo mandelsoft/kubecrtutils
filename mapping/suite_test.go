@@ -1,4 +1,4 @@
-package types_test
+package mapping_test
 
 import (
 	"testing"
