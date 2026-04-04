@@ -22,7 +22,7 @@ import (
 )
 
 type Factory interface {
-	Apply(ctx context.Context, def Definition, set types.Clusters, indices cacheindex.Indices, logger logging.Logger) (Component, error)
+	Apply(ctx context.Context, base *Base) (Component, error)
 }
 
 type Definition = interface {
@@ -206,6 +206,11 @@ func (d *_definition) Apply(ctx context.Context, m mapping.ControllerMappings, m
 		return nil, err
 	}
 
+	comps, err := Map(mgr.GetComponents(), m.ComponentMappings(), d.GetComponents())
+	if err != nil {
+		return nil, err
+	}
+
 	all := map[string]cacheindex.Index{}
 	idxmap := m.IndexMappings()
 	for _, i := range d.foreign.Elements {
@@ -223,7 +228,21 @@ func (d *_definition) Apply(ctx context.Context, m mapping.ControllerMappings, m
 
 	indices := cacheindex.NewIndices()
 	indices.Add(maputils.Values(all)...)
-	return d.factory.Apply(ctx, d, clusters, indices, logger)
+
+	b := &Base{
+		Logger:   logger,
+		def:      d,
+		self:     nil,
+		clusters: clusters,
+		comps:    comps,
+		indices:  indices,
+	}
+	c, err := d.factory.Apply(ctx, b)
+	if err != nil {
+		return nil, err
+	}
+	b.self = c
+	return c, nil
 }
 
 func registerIndex[I cacheindex.Index](logger logging.Logger, i cacheindex.Definition, clusters types.Clusters, idxmap mapping.Mappings, mgr types.ControllerManager, local map[string]I) (cacheindex.Index, error) {

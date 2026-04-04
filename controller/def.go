@@ -361,14 +361,9 @@ func (d *_definition[P, T]) Apply(ctx context.Context, m mapping.ControllerMappi
 	logger := mgr.GetLogger().WithName(d.GetName()).WithValues("controller", d.GetName())
 	logger.Info("- configure controller {{controller}}")
 
-	base := mgr.GetComponents()
-	components := component.NewComponents()
-	for n := range d.components {
-		if c := base.Get(n); c != nil {
-			components.Add(c)
-		} else {
-			return nil, fmt.Errorf("component %q not found", n)
-		}
+	comps, err := component.Map(mgr.GetComponents(), m.ComponentMappings(), d.GetComponents())
+	if err != nil {
+		return nil, err
 	}
 
 	clusters, err := cluster.Map(mgr.GetClusters(), m.ClusterMappings(), d.GetClusters())
@@ -432,7 +427,7 @@ func (d *_definition[P, T]) Apply(ctx context.Context, m mapping.ControllerMappi
 		controllerManager: mgr,
 		logger:            logger,
 		mappings:          m.ClusterMappings(),
-		components:        components,
+		components:        comps,
 		clusters:          clusters,
 		cluster:           c,
 		gk:                gk,
