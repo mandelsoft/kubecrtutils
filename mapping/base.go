@@ -10,6 +10,7 @@ type Consumer interface {
 	GetClusters() ClusterNames
 	GetComponents() ComponentNames
 	// GetRequiredClusters(mappings types.ControllerMappings) ClusterNames
+
 }
 
 type BaseMappable[S Consumer] interface {

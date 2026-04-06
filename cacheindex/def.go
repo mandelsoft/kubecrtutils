@@ -8,6 +8,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils"
 	"github.com/mandelsoft/kubecrtutils/internal"
 	"github.com/mandelsoft/kubecrtutils/mapping"
+	"github.com/mandelsoft/kubecrtutils/objutils"
 	"github.com/mandelsoft/kubecrtutils/types"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -98,7 +99,7 @@ func (d *_definition[P, T]) Apply(ctx context.Context, mappings mapping.Controll
 		return fmt.Errorf("cluster %s->%s not found", d.GetTarget(), c.GetName())
 	}
 
-	gk, err := kubecrtutils.GKForObject(c, d.proto)
+	gk, err := objutils.GKForObject(c, d.proto)
 	if err != nil {
 		return fmt.Errorf("cannot determine group/kind for %T: %w", d.proto, err)
 	}

@@ -40,11 +40,11 @@ type IndexDefinition interface {
 	GetResource() client.Object
 	GetIndexer() IndexerFactory
 	GetEffective() IndexDefinition
-	Apply(ctx context.Context, mappings mapping.ControllerMappings, mgr ControllerManager) error
+	Applyable
 }
 
 type IndexDefinitions interface {
 	internal.Definitions[IndexDefinition, IndexDefinitions]
-
-	CreateIndices(ctx context.Context, mgr ControllerManager) error
+	IndexProvider
+	// don't have other elements, therefore, not yet Applyable.
 }

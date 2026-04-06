@@ -17,6 +17,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/controller/constraints"
 	"github.com/mandelsoft/kubecrtutils/internal"
 	"github.com/mandelsoft/kubecrtutils/mapping"
+	"github.com/mandelsoft/kubecrtutils/objutils"
 	"github.com/mandelsoft/kubecrtutils/owner"
 	"github.com/mandelsoft/kubecrtutils/types"
 	"github.com/mandelsoft/logging"
@@ -256,12 +257,12 @@ func (d *_definition[P, T]) GetForeignIndices() cacheindex.Definitions {
 	return d.foreign
 }
 
-func (d *_definition[P, T]) CreateIndices(ctx context.Context, m mapping.ControllerMappings, mgr types.ControllerManager) error {
+func (d *_definition[P, T]) CreateIndices(ctx context.Context, mappings mapping.ControllerMappings, mgr types.ControllerManager) error {
 	logger := mgr.GetLogger().WithName(d.GetName()).WithValues("controller", d.GetName())
 
 	for n, i := range d.indices {
 		logger.Info("- configuring local index {{index}} from controller {{controller}}", "index", n, "controller", d.GetName())
-		err := i.Apply(ctx, m, mgr)
+		err := i.Apply(ctx, mappings, mgr)
 		if err != nil {
 			return fmt.Errorf("controller %q: index %q: %w", d.GetName(), n, err)
 		}
@@ -269,7 +270,7 @@ func (d *_definition[P, T]) CreateIndices(ctx context.Context, m mapping.Control
 
 	for n, i := range d.foreign.Elements {
 		logger.Info("- configuring foreign index {{index}} from controller {{controller}}", "index", n, "controller", d.GetName())
-		err := i.Apply(ctx, m, mgr)
+		err := i.Apply(ctx, mappings, mgr)
 		if err != nil {
 			return fmt.Errorf("controller %q: index %q: %w", d.GetName(), n, err)
 		}
@@ -304,9 +305,9 @@ func registerIndex[I cacheindex.Index](logger logging.Logger, i cacheindex.Defin
 	return idx.GetEffective(), nil
 }
 
-func (d *_definition[P, T]) Apply(ctx context.Context, m mapping.ControllerMappings, mgr types.ControllerManager) (types.Controller, error) {
+func (d *_definition[P, T]) Apply(ctx context.Context, m mapping.ControllerMappings, mgr types.ControllerManager) error {
 	if d.GetError() != nil {
-		return nil, d.GetError()
+		return d.GetError()
 	}
 	m = mapping.DefaultMappings(m)
 	logger := mgr.GetLogger().WithName(d.GetName()).WithValues("controller", d.GetName())
@@ -314,23 +315,23 @@ func (d *_definition[P, T]) Apply(ctx context.Context, m mapping.ControllerMappi
 
 	comps, err := mgr.GetComponents().Map(m.ComponentMappings(), d.GetComponents())
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	clusters, err := mgr.GetClusters().Map(m.ClusterMappings(), d.GetClusters())
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// keep logical view on technical cluster as requested by the definition
 	c := clusters.Get(d.cluster)
 	if c == nil {
-		return nil, fmt.Errorf("cluster %q not found", d.cluster)
+		return fmt.Errorf("cluster %q not found", d.cluster)
 	}
 
-	gk, err := kubecrtutils.GKForObject(c, d.proto)
+	gk, err := objutils.GKForObject(c, d.proto)
 	if err != nil {
-		return nil, fmt.Errorf("main resource: %w", err)
+		return fmt.Errorf("main resource: %w", err)
 	}
 
 	local := map[string]cacheindex.TypedIndex[T]{}
@@ -339,20 +340,20 @@ func (d *_definition[P, T]) Apply(ctx context.Context, m mapping.ControllerMappi
 	for n, i := range d.indices {
 		idx, err := registerIndex(logger, i, clusters, idxmap, mgr, local)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		all[n] = idx
 	}
 	for _, i := range d.foreign.Elements {
 		_, err := registerIndex(logger, i, clusters, idxmap, mgr, all)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 	for _, i := range d.imports {
 		_, err := registerIndex(logger, i, clusters, idxmap, mgr, all)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 
@@ -389,7 +390,12 @@ func (d *_definition[P, T]) Apply(ctx context.Context, m mapping.ControllerMappi
 		ohandler:          owner.NewHandler(c),
 		finalizer:         finalizer,
 	}
-	return controller, nil
+	err = mgr.GetControllers().Add(controller)
+	if err != nil {
+		return err
+	}
+
+	return controller.Complete(ctx)
 }
 
 func (d *_definition[P, T]) GetOptions() flagutils.Options {

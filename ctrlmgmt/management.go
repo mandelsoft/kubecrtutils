@@ -101,7 +101,7 @@ func NewControllerManagerByOpts(ctx context.Context, opts flagutils.OptionSetPro
 	iopts := cacheindex.From(opts)
 	if iopts != nil && iopts.Len() > 0 {
 		logger.Info("configure global indices...")
-		err = iopts.CreateIndices(ctx, cm)
+		err = iopts.CreateIndices(ctx, nil, cm)
 		if err != nil {
 			return nil, fmt.Errorf("settingup indices: %w", err)
 		}
@@ -110,7 +110,7 @@ func NewControllerManagerByOpts(ctx context.Context, opts flagutils.OptionSetPro
 	coopts := component.From(opts)
 	if coopts != nil && coopts.Len() > 0 {
 		logger.Info("configure component indices...")
-		err = coopts.CreateIndices(ctx, cm)
+		err = coopts.CreateIndices(ctx, nil, cm)
 		if err != nil {
 			return nil, fmt.Errorf("setting up component indices: %w", err)
 		}
@@ -118,14 +118,14 @@ func NewControllerManagerByOpts(ctx context.Context, opts flagutils.OptionSetPro
 
 	if cntropts != nil && cntropts.Len() > 0 {
 		logger.Info("configure controller indices...")
-		err = cntropts.CreateIndices(ctx, cm)
+		err = cntropts.CreateIndices(ctx, nil, cm)
 		if err != nil {
 			return nil, fmt.Errorf("setting up controller indices: %w", err)
 		}
 	}
 
 	if coopts != nil && coopts.Len() > 0 {
-		err = coopts.Apply(ctx, cm)
+		err = coopts.Apply(ctx, nil, cm)
 		if err != nil {
 			return nil, fmt.Errorf("setting up components: %w", err)
 		}
@@ -143,11 +143,11 @@ func NewControllerManagerByOpts(ctx context.Context, opts flagutils.OptionSetPro
 		cm.components = component.NewComponents()
 	}
 
-	cntr, err := cntropts.Apply(ctx, cm)
+	cm.controllers = controller.NewControllers()
+	err = cntropts.Apply(ctx, nil, cm)
 	if err != nil {
 		return nil, fmt.Errorf("settingup controllers: %w", err)
 	}
-	cm.controllers = cntr
 	return cm, nil
 }
 
@@ -173,6 +173,10 @@ func (cm *_controllermanager) GetControllerDefinition(name string) controller.De
 
 func (cm *_controllermanager) GetComponents() component.Components {
 	return cm.components
+}
+
+func (cm *_controllermanager) GetControllers() controller.Controllers {
+	return cm.controllers
 }
 
 func (cm *_controllermanager) GetClusters() cluster.Clusters {

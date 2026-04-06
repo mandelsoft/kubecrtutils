@@ -36,10 +36,10 @@ func (d *_mapped) GetRequiredComponents(mappings mapping.ControllerMappings) typ
 	return d.Mappable.GetRequiredComponents(mappings)
 }
 
-func (d *_mapped) CreateIndices(ctx context.Context, mapping mapping.ControllerMappings, mgr types.ControllerManager) error {
-	return d.Definition.CreateIndices(ctx, d.ApplyTo(mapping), mgr)
+func (d *_mapped) CreateIndices(ctx context.Context, mappings mapping.ControllerMappings, mgr types.ControllerManager) error {
+	return d.Definition.CreateIndices(ctx, d.ApplyTo(mappings), mgr)
 }
 
-func (d *_mapped) Apply(ctx context.Context, mapping mapping.ControllerMappings, mgr types.ControllerManager) (Component, error) {
-	return d.Definition.Apply(ctx, d.ApplyTo(mapping), mgr)
+func (d *_mapped) Apply(ctx context.Context, mappings mapping.ControllerMappings, mgr types.ControllerManager) error {
+	return d.Definition.Apply(ctx, d.ApplyTo(mappings), mgr)
 }

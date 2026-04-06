@@ -47,12 +47,8 @@ type ControllerDefinition interface {
 	GetError() error
 	GetOptions() flagutils.Options
 
-	// CreateIndices creates and exports locally defined indices prior to controller creation.
-	CreateIndices(ctx context.Context, mapping mapping.ControllerMappings, mgr ControllerManager) error
-
-	// CreateController handles the global definitions and provides
-	// a Controller
-	Apply(ctx context.Context, mapping mapping.ControllerMappings, mgr ControllerManager) (Controller, error)
+	IndexProvider
+	Applyable
 }
 
 type ControllerDefinitions interface {
@@ -65,8 +61,8 @@ type ControllerDefinitions interface {
 	ClusterFilter
 	ComponentFilter
 
-	CreateIndices(ctx context.Context, mgr ControllerManager) error
-	Apply(ctx context.Context, manager ControllerManager) (Controllers, error)
+	IndexProvider
+	Applyable
 }
 
 type Controller interface {

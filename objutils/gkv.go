@@ -1,4 +1,4 @@
-package kubecrtutils
+package objutils
 
 import (
 	"github.com/mandelsoft/kubecrtutils/types"

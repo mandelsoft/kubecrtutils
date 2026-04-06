@@ -6,6 +6,7 @@ import (
 
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/kubecrtutils/internal"
+	"github.com/mandelsoft/kubecrtutils/mapping"
 	"github.com/mandelsoft/kubecrtutils/types"
 )
 
@@ -26,7 +27,7 @@ func NewDefinitions() Definitions {
 }
 
 // CreateIndices creates the indices for not disabled clusters.
-func (d *_definitions) CreateIndices(ctx context.Context, mgr types.ControllerManager) error {
+func (d *_definitions) CreateIndices(ctx context.Context, mappings mapping.ControllerMappings, mgr types.ControllerManager) error {
 	if d.GetError() != nil {
 		return d.GetError()
 	}
@@ -37,7 +38,7 @@ func (d *_definitions) CreateIndices(ctx context.Context, mgr types.ControllerMa
 		if clusters.IsDisabled(i.GetTarget()) {
 			continue
 		}
-		err := i.Apply(ctx, nil, mgr)
+		err := i.Apply(ctx, mappings, mgr)
 		if err != nil {
 			return fmt.Errorf("index %q: %w", n, err)
 		}

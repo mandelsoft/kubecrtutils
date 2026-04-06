@@ -15,6 +15,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/types"
 	"github.com/mandelsoft/logging"
 	"github.com/spf13/pflag"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
 type Factory interface {
@@ -33,8 +34,8 @@ type Definition = interface {
 	GetRequiredClusters(mappings mapping.ControllerMappings) types.ClusterNames
 	GetRequiredComponents(mappings mapping.ControllerMappings) ComponentNames
 
-	CreateIndices(ctx context.Context, mapping mapping.ControllerMappings, mgr types.ControllerManager) error
-	Apply(ctx context.Context, mapping mapping.ControllerMappings, mgr types.ControllerManager) (Component, error)
+	types.IndexProvider
+	types.Applyable
 }
 
 type _definition struct {
@@ -141,12 +142,12 @@ func (d *_definition) Finalize(ctx context.Context, opts flagutils.OptionSet, v 
 	return v.FinalizeSet(ctx, opts, d.AsOptionSet())
 }
 
-func (d *_definition) CreateIndices(ctx context.Context, m mapping.ControllerMappings, mgr types.ControllerManager) error {
+func (d *_definition) CreateIndices(ctx context.Context, mappings mapping.ControllerMappings, mgr types.ControllerManager) error {
 	logger := mgr.GetLogger().WithName(d.GetName()).WithValues("component", d.GetName())
 
 	for n, i := range d.foreign.Elements {
 		logger.Info("- configuring foreign index {{index}} from component {{component}}", "index", n, "component", d.GetName())
-		err := i.Apply(ctx, m, mgr)
+		err := i.Apply(ctx, mappings, mgr)
 		if err != nil {
 			return fmt.Errorf("component %q: index %q: %w", d.GetName(), n, err)
 		}
@@ -154,19 +155,19 @@ func (d *_definition) CreateIndices(ctx context.Context, m mapping.ControllerMap
 	return nil
 }
 
-func (d *_definition) Apply(ctx context.Context, m mapping.ControllerMappings, mgr types.ControllerManager) (Component, error) {
+func (d *_definition) Apply(ctx context.Context, m mapping.ControllerMappings, mgr types.ControllerManager) error {
 	logger := mgr.GetLogger().WithName(d.GetName()).WithValues("component", d.GetName())
 	logger.Info("- configure component {{component}}", "component", d.GetName())
 
 	m = mapping.DefaultMappings(m)
 	clusters, err := mgr.GetClusters().Map(m.ClusterMappings(), d.GetClusters())
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	comps, err := mgr.GetComponents().Map(m.ComponentMappings(), d.GetComponents())
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	all := map[string]cacheindex.Index{}
@@ -174,13 +175,13 @@ func (d *_definition) Apply(ctx context.Context, m mapping.ControllerMappings, m
 	for _, i := range d.foreign.Elements {
 		_, err := registerIndex(logger, i, clusters, idxmap, mgr, all)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 	for _, i := range d.imports {
 		_, err := registerIndex(logger, i, clusters, idxmap, mgr, all)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 
@@ -199,10 +200,18 @@ func (d *_definition) Apply(ctx context.Context, m mapping.ControllerMappings, m
 	}
 	c, err := d.factory.Apply(ctx, b)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	b.self = c
-	return c, nil
+	err = mgr.GetComponents().Add(c)
+	if err != nil {
+		return err
+	}
+	if r, ok := c.(manager.Runnable); ok {
+		logger.Info("  register as runnable")
+		mgr.GetManager().GetLocalManager().Add(r)
+	}
+	return nil
 }
 
 func registerIndex[I cacheindex.Index](logger logging.Logger, i cacheindex.Definition, clusters types.Clusters, idxmap mapping.Mappings, mgr types.ControllerManager, local map[string]I) (cacheindex.Index, error) {

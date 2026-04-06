@@ -171,7 +171,7 @@ func (c *_controller[P, T]) Complete(ctx context.Context) error {
 }
 
 func (c *_controller[P, T]) addTrigger(ctx context.Context, bldr *mcbuilder.Builder, tdef ResourceTriggerDefinition) error {
-	gk, err := kubecrtutils.GKForObject(c.GetCluster(), tdef.GetResource())
+	gk, err := objutils.GKForObject(c.GetCluster(), tdef.GetResource())
 	if err != nil {
 		return fmt.Errorf("cannot determine group kind for %T: %w", tdef.GetResource(), err)
 	}

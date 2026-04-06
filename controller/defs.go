@@ -10,6 +10,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/component"
 	"github.com/mandelsoft/kubecrtutils/controller/constraints"
 	"github.com/mandelsoft/kubecrtutils/internal"
+	"github.com/mandelsoft/kubecrtutils/mapping"
 	"github.com/mandelsoft/kubecrtutils/options/activationopts"
 	"github.com/mandelsoft/kubecrtutils/types"
 	"github.com/spf13/pflag"
@@ -133,7 +134,7 @@ func (d *_definitions) GetUsedComponents(ctx constraints.Context) component.Comp
 	return names
 }
 
-func (d *_definitions) CreateIndices(ctx context.Context, mgr types.ControllerManager) error {
+func (d *_definitions) CreateIndices(ctx context.Context, mappings mapping.ControllerMappings, mgr types.ControllerManager) error {
 	mgr.GetLogger().Info("configure controller defined indices...")
 	if d.GetError() != nil {
 		return d.GetError()
@@ -166,7 +167,7 @@ func (d *_definitions) CreateIndices(ctx context.Context, mgr types.ControllerMa
 		if !d.filter.Use(c.GetName()) {
 			continue // should we create indices if they are required elsewhere
 		}
-		err := c.CreateIndices(ctx, nil, mgr)
+		err := c.CreateIndices(ctx, mappings, mgr)
 		if err != nil {
 			return err
 		}
@@ -174,39 +175,23 @@ func (d *_definitions) CreateIndices(ctx context.Context, mgr types.ControllerMa
 	return nil
 }
 
-func (d *_definitions) Apply(ctx context.Context, mgr types.ControllerManager) (Controllers, error) {
+func (d *_definitions) Apply(ctx context.Context, mappings mapping.ControllerMappings, mgr types.ControllerManager) error {
 	mgr.GetLogger().Info("configure controllers...")
 	if d.GetError() != nil {
-		return nil, d.GetError()
+		return d.GetError()
 	}
 
-	controllers := NewControllers()
 	// Step 1: create controllers and their environment like indices
 	for n, i := range d.Elements {
 		if !d.filter.Use(n) {
 			continue
 		}
-		c, err := i.Apply(ctx, nil, mgr)
+		err := i.Apply(ctx, nil, mgr)
 		if err != nil {
-			return nil, fmt.Errorf("controller %q: %w", n, err)
-		}
-		err = controllers.Add(c)
-		if err != nil {
-			return nil, fmt.Errorf("controller %q: %w", n, err)
+			return fmt.Errorf("controller %q: %w", n, err)
 		}
 	}
-	// Step 2: complete the controller by creating their reconciler
-	// (by factory) and finally configure the controller runtime manager.
-	for n, i := range controllers.Elements {
-		if !d.filter.Use(n) {
-			continue
-		}
-		err := i.Complete(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("controller %q: %w", n, err)
-		}
-	}
-	return controllers, nil
+	return nil
 }
 
 func (d *_definitions) AsOptionSet() flagutils.OptionSet {

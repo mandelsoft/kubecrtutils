@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/mandelsoft/goutils/general"
-	"github.com/mandelsoft/kubecrtutils"
 	"github.com/mandelsoft/kubecrtutils/controller/handler"
+	"github.com/mandelsoft/kubecrtutils/objutils"
 	"github.com/mandelsoft/kubecrtutils/owner"
 	"github.com/mandelsoft/kubecrtutils/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -26,7 +26,7 @@ func ownerMapFuncFactory[T client.Object](owmerproto client.Object, local bool) 
 		if owmerproto == nil {
 			owmerproto = c.GetResource()
 		}
-		gk, err := kubecrtutils.GKForObject(c.GetCluster(), owmerproto)
+		gk, err := objutils.GKForObject(c.GetCluster(), owmerproto)
 		if err != nil {
 			return nil, err
 		}

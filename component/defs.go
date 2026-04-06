@@ -3,16 +3,18 @@ package component
 import (
 	"context"
 	"fmt"
+	"iter"
+	"strings"
 
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/goutils/set"
 	"github.com/mandelsoft/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubecrtutils/controller/constraints"
 	"github.com/mandelsoft/kubecrtutils/internal"
+	"github.com/mandelsoft/kubecrtutils/mapping"
 	"github.com/mandelsoft/kubecrtutils/options/activationopts"
 	"github.com/mandelsoft/kubecrtutils/types"
 	"github.com/mandelsoft/kubecrtutils/utils"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
 type ComponentFilter interface {
@@ -29,8 +31,8 @@ type Definitions interface {
 
 	flagutils.Validatable
 
-	CreateIndices(ctx context.Context, mgr types.ControllerManager) error
-	Apply(ctx context.Context, mgr types.ControllerManager) error
+	types.IndexProvider
+	types.Applyable
 }
 
 type _definitions struct {
@@ -38,6 +40,7 @@ type _definitions struct {
 
 	cctx     constraints.Context
 	required ComponentNames
+	order    []string
 }
 
 func NewDefinitions() Definitions {
@@ -79,7 +82,23 @@ func (d *_definitions) Validate(ctx context.Context, opts flagutils.OptionSet, v
 	if copts != nil {
 		d.cctx = copts.GetContraintContext()
 	}
+
+	order, cycle := utils.TopoSort(d.Elements, d.deps)
+	if cycle != nil {
+		return fmt.Errorf("dependency cyle for components: %s", strings.Join(cycle, "->"))
+	}
+	d.order = order
 	return v.ValidateSet(ctx, opts, d.AsOptionSet()) // forward validation
+}
+
+func (d *_definitions) deps(def Definition) iter.Seq2[string, Definition] {
+	return func(yield func(string, Definition) bool) {
+		for k := range def.GetComponents() {
+			if !yield(k, d.Get(k)) {
+				return
+			}
+		}
+	}
 }
 
 func (d *_definitions) GetUsedClusters(ctx constraints.Context) cluster.ClusterNames {
@@ -108,7 +127,7 @@ func (d *_definitions) GetUsedComponents(ctx constraints.Context) ComponentNames
 	return names
 }
 
-func (d *_definitions) CreateIndices(ctx context.Context, mgr types.ControllerManager) error {
+func (d *_definitions) CreateIndices(ctx context.Context, mappings mapping.ControllerMappings, mgr types.ControllerManager) error {
 	for _, c := range d.Elements {
 		if ok, err := d.isUsed(c); !ok || err != nil {
 			if err != nil {
@@ -116,7 +135,7 @@ func (d *_definitions) CreateIndices(ctx context.Context, mgr types.ControllerMa
 			}
 			continue
 		}
-		err := c.CreateIndices(ctx, nil, mgr)
+		err := c.CreateIndices(ctx, mappings, mgr)
 		if err != nil {
 			return err
 		}
@@ -124,25 +143,18 @@ func (d *_definitions) CreateIndices(ctx context.Context, mgr types.ControllerMa
 	return nil
 }
 
-func (d *_definitions) Apply(ctx context.Context, mgr types.ControllerManager) error {
+func (d *_definitions) Apply(ctx context.Context, mappings mapping.ControllerMappings, mgr types.ControllerManager) error {
 	mgr.GetLogger().Info("configure components...")
 
-	for n, c := range d.Elements {
+	for _, n := range d.order {
+		c := d.Get(n)
 		if ok, err := d.isUsed(c); !ok || err != nil {
 			continue
 		}
 
-		comp, err := c.Apply(ctx, nil, mgr)
+		err := c.Apply(ctx, mappings, mgr)
 		if err != nil {
 			return fmt.Errorf("component %q: %w", n, err)
-		}
-		err = mgr.GetComponents().Add(comp)
-		if err != nil {
-			return fmt.Errorf("component %q: %w", n, err)
-		}
-		if r, ok := comp.(manager.Runnable); ok {
-			mgr.GetLogger().Info("  register as runnable")
-			mgr.GetManager().GetLocalManager().Add(r)
 		}
 	}
 	return nil

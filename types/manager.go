@@ -10,10 +10,11 @@ type ControllerManager interface {
 	GetManager() mcctrl.Manager
 	GetMainCluster() ClusterEquivalent
 	MapTechnicalName(name string) ClusterEquivalent
-	GetComponents() Components
 	GetClusters() Clusters
-	GetIndex(name string) Index
 	GetIndices() Indices
+	GetIndex(name string) Index
+	GetComponents() Components
+	GetControllers() Controllers
 
 	GetLogger() logging.Logger
 	GetControllerDefinition(name string) ControllerDefinition
