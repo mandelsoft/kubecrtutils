@@ -3,6 +3,7 @@ package cacheindex
 import (
 	"context"
 
+	"github.com/mandelsoft/goutils/reflectutils"
 	"github.com/mandelsoft/kubecrtutils/mapping"
 	"github.com/mandelsoft/kubecrtutils/types"
 )
@@ -13,6 +14,12 @@ import (
 // should be consistent with controller/mappings.go
 
 ////////////////////////////////////////////////////////////////////////////////
+
+var _ reflectutils.Unwrappable[Definition] = (*_mapped)(nil)
+
+func (d *_mapped) Unwrap() Definition {
+	return d.Definition
+}
 
 func (d *_mapped) GetRequiredClusters(mappings mapping.ControllerMappings) types.ClusterNames {
 	// resolve method

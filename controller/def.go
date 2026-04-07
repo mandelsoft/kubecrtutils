@@ -8,6 +8,7 @@ import (
 	"slices"
 
 	"github.com/mandelsoft/flagutils"
+	"github.com/mandelsoft/goutils/errors"
 	"github.com/mandelsoft/goutils/generics"
 	"github.com/mandelsoft/goutils/set"
 	"github.com/mandelsoft/kubecrtutils"
@@ -27,6 +28,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
+
+func DefinitionFromContext(ctx context.Context) Definition {
+	return generics.Cast[Definition](ctx.Value("controller"))
+}
 
 // ReconcilerFactory is responsible to create a reconciler for the
 // given object type.
@@ -181,6 +186,16 @@ func (d *_definition[P, T]) AddTrigger(trigger ...ResourceTriggerDefinition) Typ
 
 ////////////////////////////////////////////////////////////////////////////////
 
+func (d *_definition[P, T]) GetOptions() flagutils.Options {
+	if o, ok := d.reconciler.(flagutils.OptionSetProvider); ok {
+		return o.AsOptionSet()
+	}
+	if o, ok := d.reconciler.(flagutils.Options); ok {
+		return o
+	}
+	return nil
+}
+
 func (d *_definition[P, T]) AddFlags(fs *pflag.FlagSet) {
 	if o, ok := d.reconciler.(flagutils.Options); ok {
 		o.AddFlags(fs)
@@ -197,9 +212,16 @@ func (d *_definition[P, T]) AsOptionSet() flagutils.OptionSet {
 	return flagutils.NewOptionSet()
 }
 
+func (d *_definition[P, T]) Prepare(ctx context.Context, opts flagutils.OptionSet, v flagutils.PreparationSet) error {
+	if o, ok := d.reconciler.(flagutils.Preparable); ok {
+		return errors.Wrapf(o.Prepare(ctx, opts, v), "%s: ", d.GetName())
+	}
+	return v.PrepareSet(ctx, opts, d.AsOptionSet())
+}
+
 func (d *_definition[P, T]) Validate(ctx context.Context, opts flagutils.OptionSet, v flagutils.ValidationSet) error {
 	if o, ok := d.reconciler.(flagutils.Validatable); ok {
-		return o.Validate(ctx, opts, v)
+		return errors.Wrapf(o.Validate(ctx, opts, v), "%s: ", d.GetName())
 	}
 	for _, i := range d.foreign.Elements {
 		if !d.GetClusters().Contains(i.GetTarget()) {
@@ -259,6 +281,8 @@ func (d *_definition[P, T]) GetForeignIndices() cacheindex.Definitions {
 
 func (d *_definition[P, T]) CreateIndices(ctx context.Context, mappings mapping.ControllerMappings, mgr types.ControllerManager) error {
 	logger := mgr.GetLogger().WithName(d.GetName()).WithValues("controller", d.GetName())
+
+	ctx = context.WithValue(ctx, "controller", d)
 
 	for n, i := range d.indices {
 		logger.Info("- configuring local index {{index}} from controller {{controller}}", "index", n, "controller", d.GetName())
@@ -375,6 +399,12 @@ func (d *_definition[P, T]) Apply(ctx context.Context, m mapping.ControllerMappi
 	if m, ok := d.GetReconciler().(FinalizerModifier); ok {
 		finalizer = m.ModifyFinalizer(finalizer)
 	}
+
+	call := cacheindex.NewIndices()
+	for n, i := range all {
+		call.Add(cacheindex.NewAlias(n, i))
+	}
+
 	controller := &_controller[P, T]{
 		controllerManager: mgr,
 		logger:            logger,
@@ -386,7 +416,7 @@ func (d *_definition[P, T]) Apply(ctx context.Context, m mapping.ControllerMappi
 		definition:        d,
 		recorder:          f,
 		localIndices:      local,
-		allIndices:        all,
+		indices:           call,
 		ohandler:          owner.NewHandler(c),
 		finalizer:         finalizer,
 	}
@@ -396,13 +426,6 @@ func (d *_definition[P, T]) Apply(ctx context.Context, m mapping.ControllerMappi
 	}
 
 	return controller.Complete(ctx)
-}
-
-func (d *_definition[P, T]) GetOptions() flagutils.Options {
-	if o, ok := d.reconciler.(flagutils.Options); ok {
-		return o
-	}
-	return nil
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -18,6 +18,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
+func DefinitionFromContext(ctx context.Context) Definition {
+	return generics.Cast[Definition](ctx.Value("component"))
+}
+
 type Factory interface {
 	Apply(ctx context.Context, base *Base) (Component, error)
 }
@@ -36,6 +40,8 @@ type Definition = interface {
 
 	types.IndexProvider
 	types.Applyable
+
+	GetOptions() flagutils.Options
 }
 
 type _definition struct {
@@ -107,6 +113,16 @@ func (d *_definition) GetForeignIndices() cacheindex.Definitions {
 	return d.foreign
 }
 
+func (d *_definition) GetOptions() flagutils.Options {
+	if o, ok := d.factory.(flagutils.OptionSetProvider); ok {
+		return o.AsOptionSet()
+	}
+	if o, ok := d.factory.(flagutils.Options); ok {
+		return o
+	}
+	return nil
+}
+
 func (d *_definition) AddFlags(fs *pflag.FlagSet) {
 	if o, ok := d.factory.(flagutils.Options); ok {
 		o.AddFlags(fs)
@@ -145,6 +161,7 @@ func (d *_definition) Finalize(ctx context.Context, opts flagutils.OptionSet, v 
 func (d *_definition) CreateIndices(ctx context.Context, mappings mapping.ControllerMappings, mgr types.ControllerManager) error {
 	logger := mgr.GetLogger().WithName(d.GetName()).WithValues("component", d.GetName())
 
+	ctx = context.WithValue(ctx, "component", d)
 	for n, i := range d.foreign.Elements {
 		logger.Info("- configuring foreign index {{index}} from component {{component}}", "index", n, "component", d.GetName())
 		err := i.Apply(ctx, mappings, mgr)

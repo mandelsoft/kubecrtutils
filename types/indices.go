@@ -27,6 +27,10 @@ type Index interface {
 	GetResource() client.Object
 }
 
+type IndexSource interface {
+	GetIndex(name string) Index
+}
+
 type Indices interface {
 	internal.Group[Index]
 }

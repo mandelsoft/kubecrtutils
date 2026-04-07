@@ -66,6 +66,12 @@ func (d *_definitions) isUsed(c Definition) (bool, error) {
 	return d.required.Contains(c.GetName()), nil
 }
 
+/*
+func (d *_definitions) Prepare(ctx context.Context, opts flagutils.OptionSet, v flagutils.PreparationSet) error {
+	return v.PrepareSet(ctx, opts, d.DefinitionsImpl.AsOptionSet())
+}
+*/
+
 func (d *_definitions) Validate(ctx context.Context, opts flagutils.OptionSet, v flagutils.ValidationSet) error {
 	_, err := flagutils.ValidatedOptions[types.ControllerDefinition](ctx, opts, v)
 	if err != nil {

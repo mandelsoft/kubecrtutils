@@ -74,6 +74,7 @@ type Controller interface {
 	GetClusterMappings() mapping.Mappings
 	GetClusters() Clusters
 	GetComponents() Components
+	GetIndices() Indices
 	GetCluster() ClusterEquivalent
 	GetLogicalCluster(name string) ClusterEquivalent
 	GetResource() client.Object

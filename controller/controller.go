@@ -17,6 +17,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/owner"
 	"github.com/mandelsoft/kubecrtutils/types"
 	"github.com/mandelsoft/logging"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
@@ -49,11 +50,13 @@ type _controller[P kubecrtutils.ObjectPointer[T], T any] struct {
 	gk                   schema.GroupKind
 	recorder             recorderFunc
 	localIndices         map[string]cacheindex.TypedIndex[T]
-	allIndices           map[string]cacheindex.Index
+	indices              cacheindex.Indices
 	reconciler           reconcile.Reconciler
 	ohandler             owner.Handler
 	finalizer            string
 }
+
+var _ Controller = (*_controller[*v1.Secret, v1.Secret])(nil)
 
 func (c *_controller[P, T]) GetName() string {
 	return c.definition.GetName()
@@ -91,6 +94,10 @@ func (c *_controller[P, T]) GetClusters() types.Clusters {
 	return c.clusters
 }
 
+func (c *_controller[P, T]) GetIndices() cacheindex.Indices {
+	return c.indices
+}
+
 func (c *_controller[P, T]) GetComponents() types.Components {
 	return c.components
 }
@@ -121,7 +128,7 @@ func (c *_controller[P, T]) GetLocalIndex(name string) cacheindex.TypedIndex[T] 
 }
 
 func (c *_controller[P, T]) GetIndex(name string) cluster.Index {
-	return c.allIndices[name]
+	return c.indices.Get(name)
 }
 
 func (c *_controller[P, T]) GetReconciler() reconcile.Reconciler {

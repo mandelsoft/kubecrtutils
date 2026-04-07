@@ -47,6 +47,7 @@ type ReconcileRequest[T client.Object] interface {
 
 	StatusChanged() bool
 	UpdateStatus() myreconcile.Problem
+	TriggerStatusChanged()
 	GetAfter() time.Duration
 
 	Reconcile() myreconcile.Problem
@@ -122,6 +123,14 @@ func (r *BaseRequest[T]) UpdateStatus() myreconcile.Problem {
 		return myreconcile.TemporaryProblem(err)
 	}
 	return nil
+}
+
+func (r *BaseRequest[T]) TriggerStatusChanged() {
+}
+
+// Get help Goland resolve this method from interface cluster.Cluster.
+func (r *BaseRequest[T]) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	return r.Cluster.Get(ctx, key, obj, opts...)
 }
 
 type DefaultReconcileRequest[T client.Object, R any] struct {
@@ -248,6 +257,9 @@ func (d *crtReconciler[T]) Reconcile(ctx context.Context, request reconcile.Requ
 	}
 	if effreq.StatusChanged() {
 		prob = myreconcile.AggregateProblem(prob, effreq.UpdateStatus())
+		if prob == nil {
+			effreq.TriggerStatusChanged()
+		}
 	}
 	return myreconcile.Result(effreq, prob, effreq.GetAfter())
 }
