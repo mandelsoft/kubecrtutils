@@ -8,13 +8,17 @@ import (
 	"github.com/go-test/deep"
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/goutils/general"
+	"github.com/mandelsoft/goutils/generics"
 	"github.com/mandelsoft/kubecrtutils"
 	"github.com/mandelsoft/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubecrtutils/cluster/clustercontext"
 	"github.com/mandelsoft/kubecrtutils/controller"
+	"github.com/mandelsoft/kubecrtutils/controller/builder"
 	myreconcile "github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconcile"
 	"github.com/mandelsoft/kubecrtutils/types"
 	"github.com/mandelsoft/logging"
+	"github.com/spf13/pflag"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -29,11 +33,28 @@ type CRTReconciler interface {
 	GetEffective() any
 }
 
+// decrepated: use RequestFactory
 type Reconciler[T client.Object] interface {
+	RequestFactory[T]
+}
+
+type RequestFactory[T client.Object] interface {
 	Request(def *BaseRequest[T]) ReconcileRequest[T]
 }
 
-type ReconcileRequest[T client.Object] interface {
+// --- begin reconcilation logic ---
+
+type ReconcilationLogic interface {
+	Reconcile() myreconcile.Problem
+	ReconcileDeleting() myreconcile.Problem
+	ReconcileDeleted() myreconcile.Problem
+}
+
+// --- end reconcilation logic ---
+
+// --- begin request ----
+
+type Request[T client.Object] interface {
 	context.Context
 	logging.Logger
 	cluster.Cluster
@@ -49,10 +70,13 @@ type ReconcileRequest[T client.Object] interface {
 	UpdateStatus() myreconcile.Problem
 	TriggerStatusChanged()
 	GetAfter() time.Duration
+}
 
-	Reconcile() myreconcile.Problem
-	ReconcileDeleting() myreconcile.Problem
-	ReconcileDeleted() myreconcile.Problem
+// --- end request ---
+
+type ReconcileRequest[T client.Object] interface {
+	Request[T]
+	ReconcilationLogic
 }
 
 type BaseRequest[T client.Object] struct {
@@ -60,11 +84,13 @@ type BaseRequest[T client.Object] struct {
 	record.EventRecorder
 	context.Context
 	logging.Logger
-	mcreconcile.Request
 	controller types.Controller
-	Object     T
-	Orig       T
-	After      time.Duration
+	// --- begin request fields ---
+	mcreconcile.Request
+	Object T
+	Orig   T
+	After  time.Duration
+	// --- end request fields ---
 }
 
 func (r *BaseRequest[T]) GenerateNameFor(tgt, prefix string, len ...int) string {
@@ -104,7 +130,12 @@ func (r *BaseRequest[T]) GetLogicalCluster(name string) types.ClusterEquivalent 
 }
 
 func (r *BaseRequest[T]) StatusChanged() bool {
-	n := reflect.ValueOf(r.Object).Elem().FieldByName("Status").Interface()
+	v := reflect.ValueOf(r.Object).Elem().FieldByName("Status")
+	if !v.IsValid() {
+		return false
+	}
+
+	n := v.Interface()
 	o := reflect.ValueOf(r.Orig).Elem().FieldByName("Status").Interface()
 	diff := deep.Equal(n, o)
 	if len(diff) > 0 {
@@ -154,6 +185,10 @@ func (r *DefaultReconcileRequest[T, R]) Reconcile() myreconcile.Problem {
 
 ////////////////////////////////////////////////////////////////////////////////
 
+type None struct{}
+
+func (n None) AddFlags(fs *pflag.FlagSet) {}
+
 type ReconciliationByReconcileFunc[P kubecrtutils.ObjectPointer[T], T any] func(request ReconcileRequest[P]) myreconcile.Problem
 
 func (f ReconciliationByReconcileFunc[P, T]) CreateReconciler(ctx context.Context, controller controller.TypedController[P, T], b *builder2.Builder) (reconcile.Reconciler, error) {
@@ -173,18 +208,61 @@ func (r *defaultReconciler[P, T]) Request(base *BaseRequest[P]) ReconcileRequest
 
 ////////////////////////////////////////////////////////////////////////////////
 
+type DefaultRequestFactoryFuncWithOptions[O flagutils.Options, P kubecrtutils.ObjectPointer[T], T any] = func(opts O, def *BaseRequest[P]) ReconcileRequest[P]
+type DefaultRequestFactoryFunc[P kubecrtutils.ObjectPointer[T], T any] = DefaultRequestFactoryFuncWithOptions[None, P, T]
+
+type DefaultFactory[O flagutils.Options, P kubecrtutils.ObjectPointer[T], T any] struct {
+	flagutils.OptionsRef[O]
+	factory DefaultRequestFactoryFuncWithOptions[O, P, T]
+}
+
+var (
+	_ controller.ReconcilerFactory[*corev1.Secret, corev1.Secret] = (*DefaultFactory[flagutils.Options, *corev1.Secret, corev1.Secret])(nil)
+	_ flagutils.Options                                           = (*DefaultFactory[flagutils.Options, *corev1.Secret, corev1.Secret])(nil)
+	_ flagutils.Preparable                                        = (*DefaultFactory[flagutils.Options, *corev1.Secret, corev1.Secret])(nil)
+)
+
+func New[P kubecrtutils.ObjectPointer[T], T any](rf DefaultRequestFactoryFunc[P, T]) controller.ReconcilerFactory[P, T] {
+	return NewWithOptions[None, P, T](rf)
+}
+
+// NewWithOptions provides a factory for standard reconcile.Reconciler using
+// a DefaultRequestFactoryFuncWithOptions to create high level ReconcileRequest objects for the execution
+// of reconcilation requests. The given flagutils.Options type is used to extend the option handling.
+func NewWithOptions[O flagutils.Options, P kubecrtutils.ObjectPointer[T], T any](rf DefaultRequestFactoryFuncWithOptions[O, P, T]) controller.ReconcilerFactory[P, T] {
+	f := &DefaultFactory[O, P, T]{
+		OptionsRef: *flagutils.NewOptionsRef[O](generics.ObjectFor[O]),
+		factory:    rf,
+	}
+	return f
+}
+
+func (d *DefaultFactory[O, P, T]) CreateReconciler(ctx context.Context, c controller.TypedController[P, T], b builder.Builder) (reconcile.Reconciler, error) {
+	return CRTReconcilerFor[P, T](c, d), nil
+}
+
+func (d *DefaultFactory[O, P, T]) Request(def *BaseRequest[P]) ReconcileRequest[P] {
+	return d.factory(d.Options, def)
+}
+
+func (d *DefaultFactory[O, P, T]) AddFlags(fs *pflag.FlagSet) {
+	d.Options.AddFlags(fs)
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 type crtReconciler[T client.Object] struct {
 	name       string
 	controller types.Controller
 	cluster    types.ClusterEquivalent
 	logger     logging.Logger
-	reconciler Reconciler[T]
+	reconciler RequestFactory[T]
 	after      time.Duration
 }
 
 var _ CRTReconciler = (*crtReconciler[client.Object])(nil)
 
-func CRTReconcilerFor[P kubecrtutils.ObjectPointer[T], T any](c controller.TypedController[P, T], r Reconciler[P], after ...time.Duration) CRTReconciler {
+func CRTReconcilerFor[P kubecrtutils.ObjectPointer[T], T any](c controller.TypedController[P, T], r RequestFactory[P], after ...time.Duration) CRTReconciler {
 	return &crtReconciler[P]{
 		name:       c.GetName(),
 		logger:     c.GetLogger(),

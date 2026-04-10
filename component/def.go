@@ -139,6 +139,13 @@ func (d *_definition) AsOptionSet() flagutils.OptionSet {
 	return flagutils.NewOptionSet()
 }
 
+func (d *_definition) Prepare(ctx context.Context, opts flagutils.OptionSet, v flagutils.PreparationSet) error {
+	if o, ok := d.factory.(flagutils.Preparable); ok {
+		return errors.Wrapf(o.Prepare(ctx, opts, v), "%s: ", d.GetName())
+	}
+	return v.PrepareSet(ctx, opts, d.AsOptionSet())
+}
+
 func (d *_definition) Validate(ctx context.Context, opts flagutils.OptionSet, v flagutils.ValidationSet) error {
 	if o, ok := d.factory.(flagutils.Validatable); ok {
 		return errors.Wrapf(o.Validate(ctx, opts, v), "%s: ", d.GetName())

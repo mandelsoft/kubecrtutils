@@ -24,6 +24,10 @@ type standard struct {
 	scheme   *runtime.Scheme
 }
 
+type HandlerProvider interface {
+	GetOwnerHandler(scheme types.SchemeProvider) Handler
+}
+
 func NewHandler(scheme types.SchemeProvider, annos ...AnnotationType) Handler {
 	return NewHandlerWithScheme(scheme.GetScheme(), annos...)
 }

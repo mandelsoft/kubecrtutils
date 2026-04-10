@@ -21,6 +21,16 @@ func ModifyAnnotations(obj metav1.Object, mod AnnotationModifier) {
 	}
 }
 
+func CheckAnnotation(obj metav1.Object, key string, v string) bool {
+	values := obj.GetAnnotations()
+	if values == nil {
+		return false
+	}
+
+	e, ok := values[key]
+	return ok && e == v
+}
+
 func GetAnnotation(obj metav1.Object, key string) string {
 	values := obj.GetAnnotations()
 	if values == nil {

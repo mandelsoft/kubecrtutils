@@ -10,15 +10,14 @@ import (
 	"github.com/mandelsoft/kubecrtutils/controller"
 	"github.com/mandelsoft/kubecrtutils/controller/builder"
 	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconciler"
-	"github.com/spf13/pflag"
+	"github.com/mandelsoft/kubecrtutils/owner"
+	"github.com/modern-go/reflect2"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	crtreconcile "sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-type None struct{}
-
-func (n None) AddFlags(fs *pflag.FlagSet) {}
+type None = reconciler.None
 
 type SettingsFactory[O flagutils.Options, S any, P kubecrtutils.ObjectPointer[T], T any] func(ctx context.Context, o O, controller controller.TypedController[P, T]) (S, error)
 type RequestFactory[O flagutils.Options, S any, P kubecrtutils.ObjectPointer[T], T any] func(*reconciler.BaseRequest[P], *Reconciler[O, S, P, T]) reconciler.ReconcileRequest[P]
@@ -66,6 +65,35 @@ func NewByFactoryWithOptions[S any, P kubecrtutils.ObjectPointer[T], T any, F Fa
 	return New[F, S, P, T](func() F { return fac }, fac.CreateSettings, fac.CreateRequest)
 }
 
+// NewByLogicis like New but uses a default option creator for the options and the a ReconcilationLogic.
+func NewByLogic[O flagutils.Options, S any, P kubecrtutils.ObjectPointer[T], T any, F ReconcilationLogic[O, S, P, T]](fac F) *ReconcilerFactory[O, S, P, T] {
+	return New[O, S, P, T](
+		generics.ObjectFor[O],
+		fac.CreateSettings,
+		func(def *reconciler.BaseRequest[P], r *Reconciler[O, S, P, T]) reconciler.ReconcileRequest[P] {
+			return &Request[O, S, P, T]{
+				BaseRequest: def,
+				Reconciler:  r,
+				logic:       fac,
+			}
+		})
+}
+
+// NewByLogicWithOptions is like NewByLogic, but uses the factory instance
+// as options. Therefore, the options are not sharable.
+func NewByLogicWithOptions[S any, P kubecrtutils.ObjectPointer[T], T any, F ReconcilationLogicWithOptions[F, S, P, T]](fac F) *ReconcilerFactory[F, S, P, T] {
+	return New[F, S, P, T](
+		func() F { return fac },
+		fac.CreateSettings,
+		func(def *reconciler.BaseRequest[P], r *Reconciler[F, S, P, T]) reconciler.ReconcileRequest[P] {
+			return &Request[F, S, P, T]{
+				BaseRequest: def,
+				Reconciler:  r,
+				logic:       fac,
+			}
+		})
+}
+
 func (r *ReconcilerFactory[S, P, T, F]) ModifyFinalizer(f string) string {
 	reflectutils.CallOptionalInterfaceMethodOn[controller.FinalizerModifier](r.Options, f)
 	if m, ok := generics.TryCast[controller.FinalizerModifier](r.Options); ok {
@@ -90,6 +118,16 @@ func (f *ReconcilerFactory[O, S, P, T]) CreateReconciler(ctx context.Context, co
 		return nil, err
 	}
 
+	var oh owner.Handler
+	if !reflect2.IsNil(f.Options) {
+		if p, ok := any(f.Options).(owner.HandlerProvider); ok {
+			oh = p.GetOwnerHandler(controller.GetCluster())
+		}
+	}
+	if oh == nil {
+		oh = owner.NewHandler(controller.GetCluster())
+	}
+
 	r := &Reconciler[O, S, P, T]{
 		Controller:   controller,
 		Logger:       controller.GetLogger(),
@@ -99,9 +137,10 @@ func (f *ReconcilerFactory[O, S, P, T]) CreateReconciler(ctx context.Context, co
 			Group: gvks[0].Group,
 			Kind:  gvks[0].Kind,
 		},
-		Options:  f.Options,
-		Settings: set,
-		request:  f.reqfactory,
+		OwnerHandler: oh,
+		Options:      f.Options,
+		Settings:     set,
+		request:      f.reqfactory,
 	}
 	r.Info("  using main {{ctype}} {{cluster}}[{{info}}]", "ctype", controller.GetCluster().GetTypeInfo(), "cluster", controller.GetCluster().GetName(), "info", controller.GetCluster().GetInfo())
 	return reconciler.CRTReconcilerFor[P](controller, r, 0), nil
