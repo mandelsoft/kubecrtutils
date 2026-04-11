@@ -41,7 +41,7 @@ func (r *_reference[P, T]) IsRef() bool {
 
 func Ref[P kubecrtutils.ObjectPointer[T], T any](name string, target string) Reference {
 	return &_reference[P, T]{_definition[P, T]{
-		Element:                internal.NewElement(name),
+		Element:                internal.NewElement(ComposeName(name, target)),
 		DefaultClusterConsumer: *mapping.NewDefaultClusterConsumer(target),
 		target:                 target,
 		indexerFactory:         nil,
@@ -51,7 +51,7 @@ func Ref[P kubecrtutils.ObjectPointer[T], T any](name string, target string) Ref
 
 func Define[P kubecrtutils.ObjectPointer[T], T any](name string, target string, idxfunc IndexerFunc[P]) TypedDefinition[P, T] {
 	return &_definition[P, T]{
-		Element:                internal.NewElement(name),
+		Element:                internal.NewElement(ComposeName(name, target)),
 		DefaultClusterConsumer: *mapping.NewDefaultClusterConsumer(target),
 		target:                 target,
 		indexerFactory:         Lift(ConvertIndexerFunc(idxfunc)),
@@ -61,7 +61,7 @@ func Define[P kubecrtutils.ObjectPointer[T], T any](name string, target string, 
 
 func DefineByFactory[P kubecrtutils.ObjectPointer[T], T any](name string, target string, idxfactory TypedIndexerFactory[P]) TypedDefinition[P, T] {
 	return &_definition[P, T]{
-		Element:                internal.NewElement(name),
+		Element:                internal.NewElement(ComposeName(name, target)),
 		DefaultClusterConsumer: *mapping.NewDefaultClusterConsumer(target),
 		target:                 target,
 		indexerFactory:         ConvertIndexerFactory(idxfactory),
@@ -93,7 +93,7 @@ func (d *_definition[P, T]) Apply(ctx context.Context, mappings mapping.Controll
 		return err
 	}
 	c := clusters.Get(d.target).GetEffective()
-	index := mappings.IndexMappings().Map(d.GetName())
+	glob := MapName(d.GetName(), mappings)
 
 	if c == nil {
 		return fmt.Errorf("cluster %s->%s not found", d.GetTarget(), c.GetName())
@@ -107,7 +107,6 @@ func (d *_definition[P, T]) Apply(ctx context.Context, mappings mapping.Controll
 		return fmt.Errorf("indexer required for %T", d.proto)
 	}
 
-	glob := ComposeName(index, c.GetName())
 	old := mgr.GetIndex(glob)
 	if old != nil {
 		if err := Match(old, gk, c); err != nil {

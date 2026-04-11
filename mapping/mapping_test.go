@@ -20,7 +20,6 @@ var _ = Describe("Mapping Test Environment", func() {
 		})
 
 		It("composition", func() {
-
 			orig := mapping.Mappings{
 				"outer": "cli",
 			}
@@ -29,6 +28,18 @@ var _ = Describe("Mapping Test Environment", func() {
 			Expect(eff.Map("other")).To(Equal("other"))
 			Expect(eff.Map("in")).To(Equal("out"))
 			Expect(eff.Map("inner")).To(Equal("cli"))
+		})
+
+		It("extends", func() {
+			N := mapping.Mappings{
+				"outer": "effective",
+				"other": "effother",
+			}
+			eff := MA.ApplyTo(N)
+			Expect(eff.Map("inner")).To(Equal("effective"))
+			Expect(eff.Map("in")).To(Equal("out"))
+			Expect(eff.Map("other")).To(Equal("effother"))
+			Expect(eff.Map("unknown")).To(Equal("unknown"))
 		})
 	})
 })

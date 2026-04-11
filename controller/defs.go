@@ -186,7 +186,7 @@ func (d *_definitions) Apply(ctx context.Context, mappings mapping.ControllerMap
 		if !d.filter.Use(n) {
 			continue
 		}
-		err := i.Apply(ctx, nil, mgr)
+		err := i.Apply(ctx, mappings, mgr)
 		if err != nil {
 			return fmt.Errorf("controller %q: %w", n, err)
 		}

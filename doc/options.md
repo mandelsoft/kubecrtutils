@@ -17,30 +17,28 @@ Option sets enable a wide range of additional functionality:
 ### Option Lifecycle Management
 
 The central element here is the life cycle management for options provided by the `flagutils`
-package. It supports 5 major stages based on `OptionSets`.
+package. It supports 6 major stages based on `OptionSets`.
 
-- *Preparation Phase*: Before options composed in an option set are evaluated to configure a `pflag.FlagSet` an optional method `Prepare` is called with access to the complete option set.
+0) *Setup Phase*: An option set is composed, which will be used to run the other phases.
+
+1) *Preparation Phase*: Before options composed in an option set are evaluated to configure a  `pflag.FlagSet` an optional method `Prepare` is called with access to the complete option set.
   This way option implementation can configure itself based on the actual set of other option types (Go types).
 
-- *Configuration Phase*: After the preparation of an option set it can be added to the flag set, which is then evaluated against command line arguments.
+2) *Configuration Phase*: After the preparation of an option set it can be added to the flag set, which is then evaluated against command line arguments.
 
-- *Validation Phase*: After configuration an optional method `Validate` is called with access to the complete option set. This way options can validate their effective settings. They can even access other option implementations in the option set and imply an evaluation order.
-  It is possible to retrieve all implementations based on an interface. This allows options
-  to offer configurations to other options. If such a consuming option is part of the set, its validation retrieves the config providers using such a configuration interface and let
-  those options apply their settings. This way, for example, any option providing element in this library can additionally  configure the [controller manager](manager.md#managerconfig).
+3) *Validation Phase*: After configuration an optional method `Validate` is called with access to the complete option set. This way options can validate their effective settings. They can even access other option implementations in the option set and imply an evaluation order.
+   It is possible to retrieve all implementations based on an interface. This allows options to offer configurations to other options. If such a consuming option is part of the set, its validation retrieves the config providers using such a configuration interface and let those options apply their settings. This way, for example, any option providing element in this library can additionally  configure the [controller manager](manager.md#managerconfig).
 
-  During this phase it is also possible to do some option completion (potentiall based on
-  Settings of other option implementation), or to create some configured elements required 
-- during the run phase.
+   During this phase it is also possible to do some option completion (potentiall based on settings of other option implementation), or to create some configured elements required during the run phase.
 
-- *Run Phase*: Here the application is running by using the configured and validated options.
+4) *Run Phase*: Here the application is running by using the configured and validated options.
 
-- *Finalization Phase*: After the application is finished an optional method `Finalize` is called with access to the complete option set. Here, option implementation can offer some shutdown actions or release external resources allocated during the validation phase.
+5) *Finalization Phase*: After the application is finished an optional method `Finalize` is called with access to the complete option set. Here, option implementation can offer some shutdown actions or release external resources allocated during the validation phase.
 
 ### Shared Options
 
 There is one special implementation for the `Options` interface: `OptionRef`. Option references
-allow defining the same option type independently by different coption composers. A typical usecase in this library is to enable multiple [controller definitions](controllers.md#controllers) to define the same options. When those controllers are orchestrated into the same [controller manager](manager.md#manager), they are instantiated only once and provided settings are shared among those composer.
+enable to define the same option type independently by different coption composers. A typical use case in this library is to enable multiple [controller definitions](controllers.md#controllers) to define the same options. When those controllers are orchestrated into the same [controller manager](manager.md#manager), they are instantiated only once and provided settings are shared among those composer.
 
 An option ref does not configure options on its own. it uses a factory to vreate the effective options object on demand during the preparation phase and dynamically adds it once to the option set.
 
@@ -53,7 +51,7 @@ The option handling is central component of this library, it is used nearly ever
 - let orchestrated elements to require additional (potentially shared) command line options
 - handle the required options required to configure logical [clusters](clusters.md#clusters).
 
-The lifecyle is completely handled by calling the `ctrlmgmt.Setup`method like in out example:
+The lifecyle is completely handled by calling the `ctrlmgmt.Setup`method like in our example:
 
 ```go
 	err := ctrlmgmt.Setup("replicator", options, def, os.Args[1:]...)

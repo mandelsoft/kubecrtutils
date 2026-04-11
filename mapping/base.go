@@ -39,10 +39,8 @@ type Mappable[S Consumer] interface {
 }
 
 type BaseMappings[S Consumer] struct {
-	indices    Mappings
-	clusters   Mappings
-	components Mappings
-	self       S
+	_cmappings
+	self S
 }
 
 var (
@@ -54,44 +52,12 @@ var (
 func NewBaseMappings[S Consumer](self S) *BaseMappings[S] {
 	return &BaseMappings[S]{
 		self:       self,
-		indices:    Mappings{},
-		clusters:   Mappings{},
-		components: Mappings{},
+		_cmappings: *NewControllerMappings(nil),
 	}
 }
 
 func (d *BaseMappings[S]) GetSelf() S {
 	return d.self
-}
-
-func (d *BaseMappings[S]) IsNone() bool {
-	if d == nil {
-		return true
-	}
-	return (d.indices == nil || len(d.indices) == 0) &&
-		(d.clusters == nil || len(d.clusters) == 0) &&
-		(d.components == nil || len(d.components) == 0)
-}
-
-func (d *BaseMappings[S]) IsComponentsNone() bool {
-	if d == nil {
-		return true
-	}
-	return d.components == nil || len(d.components) == 0
-}
-
-func (d *BaseMappings[S]) IsClustersNone() bool {
-	if d == nil {
-		return true
-	}
-	return d.clusters == nil || len(d.clusters) == 0
-}
-
-func (d *BaseMappings[S]) IsIndicesNone() bool {
-	if d == nil {
-		return true
-	}
-	return d.indices == nil || len(d.indices) == 0
 }
 
 func (d *BaseMappings[S]) MapIndex(src, tgt string) S {
@@ -122,17 +88,6 @@ func (m *BaseMappings[S]) ClusterMappings() Mappings {
 
 func (m *BaseMappings[S]) IndexMappings() Mappings {
 	return m.indices
-}
-
-func (m *BaseMappings[S]) ApplyTo(add ControllerMappings) ControllerMappings {
-	if add == nil {
-		return m
-	}
-	return &BaseMappings[S]{
-		indices:    m.indices.ApplyTo(add.ClusterMappings()),
-		components: m.components.ApplyTo(add.ComponentMappings()),
-		clusters:   m.clusters.ApplyTo(add.ClusterMappings()),
-	}
 }
 
 func (m *BaseMappings[S]) GetRequiredClusters(mappings ControllerMappings) ClusterNames {

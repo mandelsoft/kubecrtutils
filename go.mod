@@ -9,10 +9,11 @@ require (
 	github.com/kcp-dev/logicalcluster/v3 v3.0.5
 	github.com/kcp-dev/multicluster-provider v0.5.0
 	github.com/kcp-dev/sdk v0.30.0
-	github.com/mandelsoft/flagutils v0.0.0-20260407154123-526a82628f03
+	github.com/mandelsoft/flagutils v0.0.0-20260411162530-8fa8704c866e
 	github.com/mandelsoft/goutils v0.0.0-20260407151801-9d4576be49b3
 	github.com/mandelsoft/kubedns v0.0.0-00010101000000-000000000000
 	github.com/mandelsoft/logging v0.0.0-20260220094735-62d1006ceeb4
+	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee
 	github.com/onsi/ginkgo/v2 v2.28.1
 	github.com/onsi/gomega v1.39.0
 	github.com/spf13/pflag v1.0.10
@@ -66,7 +67,6 @@ require (
 	github.com/mandelsoft/vfs v0.4.5-0.20250514111339-d7b067920e91 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
-	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_golang v1.23.2 // indirect

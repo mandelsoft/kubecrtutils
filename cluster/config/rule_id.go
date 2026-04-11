@@ -48,7 +48,7 @@ func (r *IdOption) PersonalizedWith(o *Personalization) Rule {
 
 func (r *IdOption) AddFlags(fs *pflag.FlagSet) {
 	if r.enabled {
-		fs.StringVarP(&r.id, r.name+"-identity", "", "", "context used together with "+r.name)
+		fs.StringVarP(&r.id, r.name+"-identity", "", "", "identity used together with "+r.name)
 	}
 }
 

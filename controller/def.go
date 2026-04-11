@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"maps"
-	"reflect"
 	"slices"
 
 	"github.com/mandelsoft/flagutils"
@@ -13,6 +12,7 @@ import (
 	"github.com/mandelsoft/goutils/set"
 	"github.com/mandelsoft/kubecrtutils"
 	"github.com/mandelsoft/kubecrtutils/cacheindex"
+	"github.com/mandelsoft/kubecrtutils/cacheindex/idxutils"
 	"github.com/mandelsoft/kubecrtutils/cluster/clustercontext"
 	"github.com/mandelsoft/kubecrtutils/controller/builder"
 	"github.com/mandelsoft/kubecrtutils/controller/constraints"
@@ -21,7 +21,6 @@ import (
 	"github.com/mandelsoft/kubecrtutils/objutils"
 	"github.com/mandelsoft/kubecrtutils/owner"
 	"github.com/mandelsoft/kubecrtutils/types"
-	"github.com/mandelsoft/logging"
 	"github.com/spf13/pflag"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -47,6 +46,8 @@ func (f ReconcilerFactoryFunc[P, T]) CreateReconciler(ctx context.Context, contr
 	return f(ctx, controller, b)
 }
 
+type IndexerFactory[T client.Object] = cacheindex.TypedIndexerFactory[T]
+
 ////////////////////////////////////////////////////////////////////////////////
 
 type TypedDefinition[P kubecrtutils.ObjectPointer[T], T any] interface {
@@ -64,6 +65,7 @@ type TypedDefinition[P kubecrtutils.ObjectPointer[T], T any] interface {
 
 	AddForeignIndex(i ...cacheindex.Definition) TypedDefinition[P, T]
 	AddIndex(name string, indexerFunc cacheindex.IndexerFunc[P]) TypedDefinition[P, T]
+	AddIndexByFactory(name string, indexerFunc cacheindex.TypedIndexerFactory[P]) TypedDefinition[P, T]
 	ImportIndex(reference cacheindex.Reference) TypedDefinition[P, T]
 	AddTrigger(trigger ...ResourceTriggerDefinition) TypedDefinition[P, T]
 	UseCluster(name ...string) TypedDefinition[P, T]
@@ -78,14 +80,14 @@ type _definition[P kubecrtutils.ObjectPointer[T], T any] struct {
 	cluster     string
 	proto       client.Object
 	reconciler  ReconcilerFactory[P, T]
-	indices     map[string]cacheindex.TypedDefinition[P, T]
-	imports     map[string]cacheindex.Definition
+	indices     cacheindex.Definitions
+	imports     cacheindex.Definitions
+	foreign     cacheindex.Definitions
 	triggers    []ResourceTriggerDefinition
 	constraints constraints.Constraints
 	groups      set.Set[string]
-	finalizer   string
 
-	foreign cacheindex.Definitions
+	finalizer string
 }
 
 func DefineByFunc[P kubecrtutils.ObjectPointer[T], T any](name string, cluster string, fac ReconcilerFactoryFunc[P, T]) TypedDefinition[P, T] {
@@ -100,11 +102,11 @@ func Define[P kubecrtutils.ObjectPointer[T], T any](name string, cluster string,
 		cluster:         cluster,
 		proto:           generics.ObjectFor[P](),
 		reconciler:      fac,
-		indices:         map[string]cacheindex.TypedDefinition[P, T]{},
-		imports:         map[string]cacheindex.Definition{},
+		indices:         cacheindex.NewDefinitions(),
+		foreign:         cacheindex.NewDefinitions(),
+		imports:         cacheindex.NewDefinitions(),
 		groups:          set.New[string](),
 		constraints:     constraints.New(),
-		foreign:         cacheindex.NewDefinitions(),
 	}
 	d.UseCluster(cluster)
 	return d
@@ -143,7 +145,7 @@ func (d *_definition[P, T]) WithActivationConstraint(constraints ...constraints.
 func (d *_definition[P, T]) AddForeignIndex(indices ...cacheindex.Definition) TypedDefinition[P, T] {
 	for _, i := range indices {
 		name := i.GetName()
-		if d.indices[name] != nil || d.imports[name] != nil || d.foreign.Get(i.GetName()) != nil {
+		if d.indices.Get(name) != nil || d.imports.Get(name) != nil || d.foreign.Get(name) != nil {
 			d.AddError(fmt.Errorf("duplicate definition of index %q", name))
 		} else {
 			d.foreign.Add(i)
@@ -153,11 +155,25 @@ func (d *_definition[P, T]) AddForeignIndex(indices ...cacheindex.Definition) Ty
 }
 
 func (d *_definition[P, T]) AddIndex(name string, indexerFunc cacheindex.IndexerFunc[P]) TypedDefinition[P, T] {
-	if d.indices[name] != nil || d.imports[name] != nil || d.foreign.Get(name) != nil {
-		d.AddError(fmt.Errorf("duplicate definition of index %q", name))
+	n := cacheindex.ComposeName(name, d.cluster)
+	if d.indices.Get(n) != nil || d.imports.Get(n) != nil || d.foreign.Get(n) != nil {
+		d.AddError(fmt.Errorf("duplicate definition of index %q[%s]", name, n))
 	} else {
 		i := cacheindex.Define[P, T](name, d.cluster, indexerFunc)
-		d.indices[name] = i
+		d.indices.Add(i)
+		d.AddError(i, "index ", name)
+		d.UseCluster(i.GetTarget())
+	}
+	return d
+}
+
+func (d *_definition[P, T]) AddIndexByFactory(name string, indexerFunc IndexerFactory[P]) TypedDefinition[P, T] {
+	n := cacheindex.ComposeName(name, d.cluster)
+	if d.indices.Get(n) != nil || d.imports.Get(n) != nil || d.foreign.Get(n) != nil {
+		d.AddError(fmt.Errorf("duplicate definition of index %q[%s]", name, n))
+	} else {
+		i := cacheindex.DefineByFactory[P, T](name, d.cluster, indexerFunc)
+		d.indices.Add(i)
 		d.AddError(i, "index ", name)
 		d.UseCluster(i.GetTarget())
 	}
@@ -165,11 +181,12 @@ func (d *_definition[P, T]) AddIndex(name string, indexerFunc cacheindex.Indexer
 }
 
 func (d *_definition[P, T]) ImportIndex(def cacheindex.Reference) TypedDefinition[P, T] {
-	if d.indices[def.GetName()] != nil || d.imports[def.GetName()] != nil || d.foreign.Get(def.GetName()) != nil {
+	name := def.GetName()
+	if d.indices.Get(name) != nil || d.imports.Get(def.GetName()) != nil || d.foreign.Get(def.GetName()) != nil {
 		d.AddError(fmt.Errorf("duplicate dedinition of index %q", def.GetName()))
 	} else {
 		d.AddError(def, "index ", def.GetName())
-		d.imports[def.GetName()] = def
+		d.imports.Add(def)
 	}
 	return d
 }
@@ -283,8 +300,9 @@ func (d *_definition[P, T]) CreateIndices(ctx context.Context, mappings mapping.
 	logger := mgr.GetLogger().WithName(d.GetName()).WithValues("controller", d.GetName())
 
 	ctx = context.WithValue(ctx, "controller", d)
+	ctx = context.WithValue(ctx, "options", d.GetOptions())
 
-	for n, i := range d.indices {
+	for n, i := range d.indices.Elements {
 		logger.Info("- configuring local index {{index}} from controller {{controller}}", "index", n, "controller", d.GetName())
 		err := i.Apply(ctx, mappings, mgr)
 		if err != nil {
@@ -300,33 +318,6 @@ func (d *_definition[P, T]) CreateIndices(ctx context.Context, mappings mapping.
 		}
 	}
 	return nil
-}
-
-func registerIndex[I cacheindex.Index](logger logging.Logger, i cacheindex.Definition, clusters types.Clusters, idxmap mapping.Mappings, mgr types.ControllerManager, local map[string]I) (cacheindex.Index, error) {
-	n := i.GetName()
-	c := clusters.Get(i.GetTarget()).GetEffective()
-	glob := cacheindex.ComposeName(idxmap.Map(n), c.GetName())
-
-	// import indexer
-	idx := mgr.GetIndex(glob)
-	if idx == nil {
-		return nil, fmt.Errorf("imported index %q->%q not found", n, glob)
-	}
-
-	f := i.GetIndexer()
-	if f == nil {
-		logger.Info("  importing index {{index}}->{{global}}", "index", n, "global", glob)
-	} else {
-		logger.Info("  using local index {{index}}->{{global}}", "index", n, "global", glob)
-	}
-	if reflect.TypeOf(i.GetResource()) != reflect.TypeOf(idx.GetResource()) {
-		return nil, fmt.Errorf("index %q->%g resource type mismatch: expected %T, but found %T", n, glob, i.GetResource(), idx.GetResource())
-	}
-	if c != idx.GetCluster().GetEffective() {
-		return nil, fmt.Errorf("index %q->%q cluster mismatch: expected %s[%s], but found %s", n, glob, i.GetTarget(), c.GetEffective().GetName(), idx.GetCluster().GetEffective().GetName())
-	}
-	local[n] = generics.Cast[I](idx.GetEffective())
-	return idx.GetEffective(), nil
 }
 
 func (d *_definition[P, T]) Apply(ctx context.Context, m mapping.ControllerMappings, mgr types.ControllerManager) error {
@@ -360,25 +351,17 @@ func (d *_definition[P, T]) Apply(ctx context.Context, m mapping.ControllerMappi
 
 	local := map[string]cacheindex.TypedIndex[T]{}
 	all := map[string]cacheindex.Index{}
-	idxmap := m.IndexMappings()
-	for n, i := range d.indices {
-		idx, err := registerIndex(logger, i, clusters, idxmap, mgr, local)
+	for n, i := range d.indices.Elements {
+		err := idxutils.ImportIndex(logger, i, clusters, m, mgr, local, cacheindex.BaseName)
 		if err != nil {
 			return err
 		}
-		all[n] = idx
+		all[n] = local[cacheindex.BaseName(n)]
 	}
-	for _, i := range d.foreign.Elements {
-		_, err := registerIndex(logger, i, clusters, idxmap, mgr, all)
-		if err != nil {
-			return err
-		}
-	}
-	for _, i := range d.imports {
-		_, err := registerIndex(logger, i, clusters, idxmap, mgr, all)
-		if err != nil {
-			return err
-		}
+
+	err = idxutils.ImportIndices(all, logger, d.cluster, clusters, m, mgr, d.imports, d.foreign)
+	if err != nil {
+		return err
 	}
 
 	evtSource := mgr.GetName() + "/" + c.GetName()

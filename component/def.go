@@ -9,6 +9,7 @@ import (
 	"github.com/mandelsoft/goutils/errors"
 	"github.com/mandelsoft/goutils/generics"
 	"github.com/mandelsoft/kubecrtutils/cacheindex"
+	"github.com/mandelsoft/kubecrtutils/cacheindex/idxutils"
 	"github.com/mandelsoft/kubecrtutils/controller/constraints"
 	"github.com/mandelsoft/kubecrtutils/internal"
 	"github.com/mandelsoft/kubecrtutils/mapping"
@@ -50,7 +51,7 @@ type _definition struct {
 	mapping.DefaultConsumer
 	constraints constraints.Constraints
 	foreign     cacheindex.Definitions
-	imports     map[string]cacheindex.Definition
+	imports     cacheindex.Definitions
 
 	factory Factory
 }
@@ -64,7 +65,7 @@ func Define(name string, fac Factory) *_definition {
 		DefaultConsumer: *mapping.NewDefaultConsumer(),
 		constraints:     constraints.New(),
 		foreign:         cacheindex.NewDefinitions(),
-		imports:         map[string]cacheindex.Definition{},
+		imports:         cacheindex.NewDefinitions(),
 		factory:         fac,
 	}
 }
@@ -85,18 +86,18 @@ func (d *_definition) WithActivationConstraint(constraints ...constraints.Constr
 }
 
 func (d *_definition) ImportIndex(def cacheindex.Reference) *_definition {
-	if d.imports[def.GetName()] != nil || d.foreign.Get(def.GetName()) != nil {
+	if d.imports.Get(def.GetName()) != nil || d.foreign.Get(def.GetName()) != nil {
 		d.AddError(fmt.Errorf("duplicate dedinition of index %q", def.GetName()))
 	} else {
 		d.AddError(def, "index ", def.GetName())
-		d.imports[def.GetName()] = def
+		d.imports.Add(def)
 	}
 	return d
 }
 
 func (d *_definition) AddForeignIndex(indices ...cacheindex.Definition) *_definition {
 	for _, i := range indices {
-		if d.imports[i.GetName()] != nil || d.foreign.Get(i.GetName()) != nil {
+		if d.imports.Get(i.GetName()) != nil || d.foreign.Get(i.GetName()) != nil {
 			d.AddError(fmt.Errorf("duplicate dedinition of index %q", i.GetName()))
 		} else {
 			d.foreign.Add(i)
@@ -169,6 +170,7 @@ func (d *_definition) CreateIndices(ctx context.Context, mappings mapping.Contro
 	logger := mgr.GetLogger().WithName(d.GetName()).WithValues("component", d.GetName())
 
 	ctx = context.WithValue(ctx, "component", d)
+	ctx = context.WithValue(ctx, "options", d.GetOptions())
 	for n, i := range d.foreign.Elements {
 		logger.Info("- configuring foreign index {{index}} from component {{component}}", "index", n, "component", d.GetName())
 		err := i.Apply(ctx, mappings, mgr)
@@ -195,18 +197,9 @@ func (d *_definition) Apply(ctx context.Context, m mapping.ControllerMappings, m
 	}
 
 	all := map[string]cacheindex.Index{}
-	idxmap := m.IndexMappings()
-	for _, i := range d.foreign.Elements {
-		_, err := registerIndex(logger, i, clusters, idxmap, mgr, all)
-		if err != nil {
-			return err
-		}
-	}
-	for _, i := range d.imports {
-		_, err := registerIndex(logger, i, clusters, idxmap, mgr, all)
-		if err != nil {
-			return err
-		}
+	err = idxutils.ImportIndices(all, logger, "", clusters, m, mgr, d.foreign, d.imports)
+	if err != nil {
+		return err
 	}
 
 	indices := cacheindex.NewIndices()

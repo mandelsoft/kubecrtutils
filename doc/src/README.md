@@ -53,6 +53,7 @@ More detailed information is described for the following topics
 # - [Clusters]({{clusters}})
 # - [Controller Manager]({{manager}})
 # - [Controllers]({{controllers}})
+# - [Components]({{components}})
 # - [Indices]({{indices}})
 # - [Owner Handling]({{owners}})
 

@@ -29,8 +29,8 @@ func (r *ReconcilationLogic) CreateSettings(ctx context.Context, o *controllers.
 	}
 
 	log := c.GetLogger()
-	log.Info("using source {{type}} {{name}}[{{info}}]", s.Source.GetTypeInfo(), s.Source.GetEffective().GetName(), s.Source.GetTypeInfo())
-	log.Info("using target {{type}} {{name}}[{{info}}]", s.Target.GetTypeInfo(), s.Target.GetEffective().GetName(), s.Target.GetTypeInfo())
+	log.Info("using source {{type}} {{name}}[{{info}}]", "type", s.Source.GetTypeInfo(), "name", s.Source.GetEffective().GetName(), "info", s.Source.GetTypeInfo())
+	log.Info("using target {{type}} {{name}}[{{info}}]", "type", s.Target.GetTypeInfo(), "name", s.Target.GetEffective().GetName(), "info", s.Target.GetTypeInfo())
 	return s, nil
 }
 

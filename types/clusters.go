@@ -58,6 +58,8 @@ type ClusterDefinitions interface {
 	GetScheme() *runtime.Scheme
 }
 
+// --- begin fleet ---
+
 type Fleet interface {
 	ClusterEquivalent
 
@@ -75,11 +77,15 @@ type Fleet interface {
 	Compose(name string) string
 }
 
+// --- end fleet ---
+
 type FleetType interface {
 	GetType() string
 	Create(defs ClusterDefinitions, definition ClusterDefinition, config config.Config, log logging.Logger) (Fleet, error)
 	GetRules(def ClusterDefinition) config.Rules
 }
+
+// --- begin cluster equivalent ---
 
 type ClusterEquivalent interface {
 	client.FieldIndexer
@@ -134,6 +140,10 @@ type ClusterEquivalent interface {
 	LiftTechnical(clusterName string) (string, Cluster)
 }
 
+// --- end cluster equivalent ---
+
+// --- begin cluster ---
+
 type Cluster interface {
 	ClusterEquivalent
 
@@ -156,6 +166,8 @@ type Cluster interface {
 	GetAPIServerURL() (*url.URL, error)
 }
 
+// --- end cluster ---
+
 type Clusters interface {
 	internal.Group[ClusterEquivalent]
 	IsMulti() bool
@@ -163,4 +175,6 @@ type Clusters interface {
 	IsDisabled(name string) bool
 
 	Map(mapping mapping.Mappings, names ClusterNames) (Clusters, error)
+
+	GetMappings() mapping.Mappings
 }

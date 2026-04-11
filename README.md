@@ -54,6 +54,7 @@ More detailed information is described for the following topics
 # - [Clusters](doc/clusters.md#clusters)
 # - [Controller Manager](doc/manager.md#manager)
 # - [Controllers](doc/controllers.md#controllers)
+# - [Components](doc/components.md#components)
 # - [Indices](doc/indices.md#indices)
 # - [Owner Handling](doc/owners.md#owners)
 
@@ -88,12 +89,14 @@ type Resource = v1.ConfigMap
 
 func Controller() controller.Definition {
 	return controller.Define[*Resource, Resource](
-		"up",
+		"replicate",
 		controllers.SOURCE,
-		support.NewByLogic[*controllers.Options, *controllers.Settings, *Resource, Resource](&ReconcilationLogic{}),
+		support.NewByLogic[*controllers.Options, *controllers.Settings, *Resource](&ReconcilationLogic{}),
 	).
 		UseCluster(controllers.TARGET).
-		AddTrigger(controller.OwnerTrigger[*Resource]().OnCluster(controllers.TARGET))
+		AddTrigger(controller.OwnerTrigger[*Resource]().OnCluster(controllers.TARGET)).
+		AddIndexByFactory("test", indexerFactory).
+		AddForeignIndex(cacheindex.DefineByFactory[*Resource]("test", controllers.TARGET, indexerFactory))
 }
 ```
 
@@ -204,8 +207,8 @@ This object is two-folded:
   	}
   
   	log := c.GetLogger()
-  	log.Info("using source {{type}} {{name}}[{{info}}]", s.Source.GetTypeInfo(), s.Source.GetEffective().GetName(), s.Source.GetTypeInfo())
-  	log.Info("using target {{type}} {{name}}[{{info}}]", s.Target.GetTypeInfo(), s.Target.GetEffective().GetName(), s.Target.GetTypeInfo())
+  	log.Info("using source {{type}} {{name}}[{{info}}]", "type", s.Source.GetTypeInfo(), "name", s.Source.GetEffective().GetName(), "info", s.Source.GetTypeInfo())
+  	log.Info("using target {{type}} {{name}}[{{info}}]", "type", s.Target.GetTypeInfo(), "name", s.Target.GetEffective().GetName(), "info", s.Target.GetTypeInfo())
   	return s, nil
   }
   
@@ -300,12 +303,12 @@ The command-line flags of our example look as follows:
 Usage of replicator:
       --annotation string                   annotation name holding the class (default "replicate.mandelsoft.de/class")
       --class string                        replication class
-      --controllers strings                 activated controllers (up, all). (default [all])
+      --controllers strings                 activated controllers (replicate, all). (default [all])
       --enable-http2                        If set, HTTP/2 will be enabled for the metrics and webhook servers
       --health-probe-bind-address string    The address the probe endpoint binds to. (default ":8081")
       --kubeconfig string                   path to standard kubeconfig
       --kubeconfig-context string           context used together with kubeconfig
-      --kubeconfig-identity string          context used together with kubeconfig
+      --kubeconfig-identity string          identity used together with kubeconfig
       --leader-elect                        Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.
       --leader-elect-namespace string       leader election namespace
       --leader-election-id string           Id for leader election
@@ -318,10 +321,10 @@ Usage of replicator:
       --metrics-secure                      If set, the metrics endpoint is served securely via HTTPS. Use --metrics-secure=false to use HTTP instead. (default true)
       --source-kubeconfig string            replication source
       --source-kubeconfig-context string    context used together with source-kubeconfig
-      --source-kubeconfig-identity string   context used together with source-kubeconfig
+      --source-kubeconfig-identity string   identity used together with source-kubeconfig
       --target-kubeconfig string            replication target
       --target-kubeconfig-context string    context used together with target-kubeconfig
-      --target-kubeconfig-identity string   context used together with target-kubeconfig
+      --target-kubeconfig-identity string   identity used together with target-kubeconfig
 ```
 
 <a id="logic"></a>

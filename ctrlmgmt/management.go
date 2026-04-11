@@ -8,6 +8,7 @@ import (
 
 	"github.com/mandelsoft/kubecrtutils/component"
 	. "github.com/mandelsoft/kubecrtutils/log"
+	"github.com/mandelsoft/kubecrtutils/mapping"
 	"sigs.k8s.io/multicluster-runtime/pkg/manager"
 
 	"github.com/mandelsoft/flagutils"
@@ -23,11 +24,9 @@ import (
 
 func NewControllerManagerByOpts(ctx context.Context, opts flagutils.OptionSetProvider) (ControllerManager, error) {
 	def := From(opts)
-
 	if def == nil {
 		return nil, fmt.Errorf("no management definition found")
 	}
-
 	if def.GetError() != nil {
 		return nil, fmt.Errorf("management definition: %w", def.GetError())
 	}
@@ -42,6 +41,7 @@ func NewControllerManagerByOpts(ctx context.Context, opts flagutils.OptionSetPro
 		return nil, fmt.Errorf("no clusters found in options")
 	}
 	clusters := copts.GetClusters()
+	mappings := mapping.NewControllerMappings(clusters.GetMappings())
 
 	logger := kubecrtutils.LogContext.WithContext(logging.NewRealm(kubecrtutils.Realm.Name() + "/" + def.GetName())).Logger()
 	logger.Info("configure controller manager {{cm}}", "cm", def.GetName())
@@ -118,14 +118,14 @@ func NewControllerManagerByOpts(ctx context.Context, opts flagutils.OptionSetPro
 
 	if cntropts != nil && cntropts.Len() > 0 {
 		logger.Info("configure controller indices...")
-		err = cntropts.CreateIndices(ctx, nil, cm)
+		err = cntropts.CreateIndices(ctx, mappings, cm)
 		if err != nil {
 			return nil, fmt.Errorf("setting up controller indices: %w", err)
 		}
 	}
 
 	if coopts != nil && coopts.Len() > 0 {
-		err = coopts.Apply(ctx, nil, cm)
+		err = coopts.Apply(ctx, mappings, cm)
 		if err != nil {
 			return nil, fmt.Errorf("setting up components: %w", err)
 		}
@@ -144,7 +144,7 @@ func NewControllerManagerByOpts(ctx context.Context, opts flagutils.OptionSetPro
 	}
 
 	cm.controllers = controller.NewControllers()
-	err = cntropts.Apply(ctx, nil, cm)
+	err = cntropts.Apply(ctx, mappings, cm)
 	if err != nil {
 		return nil, fmt.Errorf("settingup controllers: %w", err)
 	}
