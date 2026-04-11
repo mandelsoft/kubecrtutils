@@ -50,13 +50,13 @@ This project provides a wrapper for the Kubernetes [Multi-CLuster Runtime Librar
   It is possible to establish, track and get triggered by cross-cluster or cross-namespace ownership relations.
 
 More detailed information is described for the following topics
-# - [Options](doc/options.md#options)
-# - [Clusters](doc/clusters.md#clusters)
-# - [Controller Manager](doc/manager.md#manager)
-# - [Controllers](doc/controllers.md#controllers)
-# - [Components](doc/components.md#components)
-# - [Indices](doc/indices.md#indices)
-# - [Owner Handling](doc/owners.md#owners)
+ - [Options](doc/options.md#options)
+ - [Clusters](doc/clusters.md#clusters)
+ - [Controller Manager](doc/manager.md#manager)
+ - [Controllers](doc/controllers.md#controllers)
+ - [Components](doc/components.md#components)
+ - [Indices](doc/indices.md#indices)
+ - [Owner Handling](doc/owners.md#owners)
 
 ## Walkthrough
 
@@ -88,7 +88,7 @@ So, we start with our first controller, the *replicate* controller replicating a
 type Resource = v1.ConfigMap
 
 func Controller() controller.Definition {
-	return controller.Define[*Resource, Resource](
+	return controller.Define[*Resource](
 		"replicate",
 		controllers.SOURCE,
 		support.NewByLogic[*controllers.Options, *controllers.Settings, *Resource](&ReconcilationLogic{}),

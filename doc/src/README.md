@@ -49,13 +49,13 @@ This project provides a wrapper for the Kubernetes [Multi-CLuster Runtime Librar
   It is possible to establish, track and get triggered by cross-cluster or cross-namespace ownership relations.
 
 More detailed information is described for the following topics
-# - [Options]({{options}})
-# - [Clusters]({{clusters}})
-# - [Controller Manager]({{manager}})
-# - [Controllers]({{controllers}})
-# - [Components]({{components}})
-# - [Indices]({{indices}})
-# - [Owner Handling]({{owners}})
+ - [Options]({{options}})
+ - [Clusters]({{clusters}})
+ - [Controller Manager]({{manager}})
+ - [Controllers]({{controllers}})
+ - [Components]({{components}})
+ - [Indices]({{indices}})
+ - [Owner Handling]({{owners}})
 
 ## Walkthrough
 

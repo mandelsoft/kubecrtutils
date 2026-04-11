@@ -4,3 +4,29 @@
 
 <a id="indices"></a>
 ## Indices
+
+<!--- begin index names --->
+Indices use relative and absolute names. A relative name is the name as used in the declarations. The absolute name is composed by the local name and the name of the cluster it is defined for. 
+<!--- end index names --->
+
+An absolute name has the form `<relative>:<cluster>`.
+
+### Deduplications
+
+<!--- begin deduplication --->
+Indices are deduplicated, considering the base name, resource and cluster. If an index is defined on multiple clusters, that are all mapped to the same physical cluster, the index is created only once.
+
+In Go it is not possible to compare indexer functions, therefore, the base name of an index is meant to uniquely define the meaning independent of the used cluster. When orchestration index defining elements in the controller manager those *meanings* can be allinged with [mappings](#index-mapping)
+<!--- end deduplication --->
+
+For example, the relative index name describes an indexed feature of a resource. This is specific to the index and resource, but does not depend on the cluster the index is created on.
+
+To bring together local menaings and global meanings required for deduplication, relative names can be [mapped](#index-mapping) when orchestrated into a controller manager.
+
+### Index Definitions
+<a id="index-definitions"></a>
+
+<a id="index-references"></a>
+
+### Mapping
+<a id="index-mapping"></a>

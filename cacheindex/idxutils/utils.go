@@ -65,12 +65,15 @@ func AddShortNames(local string, indices map[string]cacheindex.Index) {
 	}
 }
 
-func ImportIndices(all map[string]cacheindex.Index, logger logging.Logger, local string, clusters types.Clusters, mapping mapping.ControllerMappings, mgr types.ControllerManager, defs ...cacheindex.Definitions) error {
+func ImportIndices(all map[string]cacheindex.Index, logger logging.Logger, local string, clusters types.Clusters, mapping mapping.ControllerMappings, mgr types.ControllerManager, defs ...cacheindex.Definitions) (cacheindex.Indices, error) {
+	if all == nil {
+		all = map[string]cacheindex.Index{}
+	}
 	for _, set := range defs {
 		for _, i := range set.Elements {
 			err := ImportIndex(logger, i, clusters, mapping, mgr, all, nil)
 			if err != nil {
-				return err
+				return nil, err
 			}
 		}
 	}
@@ -95,5 +98,9 @@ func ImportIndices(all map[string]cacheindex.Index, logger logging.Logger, local
 		logger.Info("  no indices used")
 	}
 
-	return nil
+	call := cacheindex.NewIndices()
+	for n, i := range all {
+		call.Add(cacheindex.NewAlias(n, i))
+	}
+	return call, nil
 }

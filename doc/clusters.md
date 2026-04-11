@@ -194,3 +194,24 @@ By evaluating the rules against a set of command line flags
 provide an appropriate configuration object, including the required rest config.
 
 This is done by implementing the [`Options` interface](options.md#options) by the `Rules` object aggregating the rule set for a dedicated cluster.
+
+### Cluster Definitions
+
+Logical clusters (cluster equivalents) can be defined using two definition flavors:
+
+- `cluster.Define(<name>, <description>)`: Definition of a regular logical Kubernetes cluster
+
+- `cluster.DefineFleet(<name>, <description>, <type>)`: Definition of a logical cluster optionally enabling the fleet feature for the given type. Supported types:
+  - `kcp.Type()`: KCP fleet type
+  The fleet type enables additional fleet specific options.
+  Future development, will change this by introducing a fleet type option, if multiple fleet types should be possible.
+
+#### Modifiers
+
+A cluster definition allows some modifiers:
+- `.WithFallback(<name>)`: If the logical cluster is not configured by the command line, a fallback cluster is used instead. If no fallback is configured, the cluster is required to be configured.
+
+#### Remarks
+
+Additionally, a default cluster with the name `cluster.DEFAULT` is always configured. There should be a fallback to this cluster. It is used if no other 
+cluster config option is given. It also includes the `in-cluster` rule for configuration. For controllers running in a cluster this cluster is by default configured for accessing the local runtime cluster.

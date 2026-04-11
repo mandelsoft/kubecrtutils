@@ -32,6 +32,7 @@ func DefinitionFromContext(ctx context.Context) Definition {
 	return generics.Cast[Definition](ctx.Value("controller"))
 }
 
+// --- begin reconciler factory ---
 // ReconcilerFactory is responsible to create a reconciler for the
 // given object type.
 // Optionally it might implement ModifyFinalizer to influence the finalizer
@@ -40,7 +41,13 @@ type ReconcilerFactory[P kubecrtutils.ObjectPointer[T], T any] interface {
 	CreateReconciler(ctx context.Context, controller TypedController[P, T], b builder.Builder) (reconcile.Reconciler, error)
 }
 
+// --- end reconciler factory ---
+
+// --- begin reconciler factory function ---
+
 type ReconcilerFactoryFunc[P kubecrtutils.ObjectPointer[T], T any] func(ctx context.Context, controller TypedController[P, T], b builder.Builder) (reconcile.Reconciler, error)
+
+// --- end reconciler factory function ---
 
 func (f ReconcilerFactoryFunc[P, T]) CreateReconciler(ctx context.Context, controller TypedController[P, T], b builder.Builder) (reconcile.Reconciler, error) {
 	return f(ctx, controller, b)
@@ -49,6 +56,8 @@ func (f ReconcilerFactoryFunc[P, T]) CreateReconciler(ctx context.Context, contr
 type IndexerFactory[T client.Object] = cacheindex.TypedIndexerFactory[T]
 
 ////////////////////////////////////////////////////////////////////////////////
+
+// --- begin controller definition ---
 
 type TypedDefinition[P kubecrtutils.ObjectPointer[T], T any] interface {
 	Definition
@@ -71,6 +80,8 @@ type TypedDefinition[P kubecrtutils.ObjectPointer[T], T any] interface {
 	UseCluster(name ...string) TypedDefinition[P, T]
 	UseComponent(name ...string) TypedDefinition[P, T]
 }
+
+// --- end controller definition ---
 
 type _definition[P kubecrtutils.ObjectPointer[T], T any] struct {
 	internal.Element
@@ -359,7 +370,7 @@ func (d *_definition[P, T]) Apply(ctx context.Context, m mapping.ControllerMappi
 		all[n] = local[cacheindex.BaseName(n)]
 	}
 
-	err = idxutils.ImportIndices(all, logger, d.cluster, clusters, m, mgr, d.imports, d.foreign)
+	call, err := idxutils.ImportIndices(all, logger, d.cluster, clusters, m, mgr, d.imports, d.foreign)
 	if err != nil {
 		return err
 	}
@@ -381,11 +392,6 @@ func (d *_definition[P, T]) Apply(ctx context.Context, m mapping.ControllerMappi
 	finalizer := mgr.GetName() + "/" + d.GetFinalizer()
 	if m, ok := d.GetReconciler().(FinalizerModifier); ok {
 		finalizer = m.ModifyFinalizer(finalizer)
-	}
-
-	call := cacheindex.NewIndices()
-	for n, i := range all {
-		call.Add(cacheindex.NewAlias(n, i))
 	}
 
 	controller := &_controller[P, T]{

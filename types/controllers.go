@@ -65,6 +65,8 @@ type ControllerDefinitions interface {
 	Applyable
 }
 
+// --- begin controller ---
+
 type Controller interface {
 	GetName() string
 	GetOptions() flagutils.Options
@@ -88,6 +90,8 @@ type Controller interface {
 
 	GenerateNameFor(ctx context.Context, tgt Cluster, prefix, namespace, name string, len ...int) string
 }
+
+// --- end controller ---
 
 type Controllers interface {
 	internal.Group[Controller]

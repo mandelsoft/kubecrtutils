@@ -196,15 +196,9 @@ func (d *_definition) Apply(ctx context.Context, m mapping.ControllerMappings, m
 		return err
 	}
 
-	all := map[string]cacheindex.Index{}
-	err = idxutils.ImportIndices(all, logger, "", clusters, m, mgr, d.foreign, d.imports)
+	indices, err := idxutils.ImportIndices(nil, logger, "", clusters, m, mgr, d.foreign, d.imports)
 	if err != nil {
 		return err
-	}
-
-	indices := cacheindex.NewIndices()
-	for n, i := range all {
-		indices.Add(cacheindex.NewAlias(n, i))
 	}
 
 	b := &Base{

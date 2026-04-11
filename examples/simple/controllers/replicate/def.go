@@ -16,7 +16,7 @@ import (
 type Resource = v1.ConfigMap
 
 func Controller() controller.Definition {
-	return controller.Define[*Resource, Resource](
+	return controller.Define[*Resource](
 		"replicate",
 		controllers.SOURCE,
 		support.NewByLogic[*controllers.Options, *controllers.Settings, *Resource](&ReconcilationLogic{}),
