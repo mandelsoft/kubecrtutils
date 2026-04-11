@@ -25,7 +25,7 @@ This project provides a wrapper for the Kubernetes [Multi-CLuster Runtime Librar
 
 - *Automated Command Line Option Handling*
 
-  Additionally, the handling of command line options is also done by the library.
+  Additionally, the handling of [command line options](doc/options.md#options) is also done by the library.
   Factories just need to implement the `Options` API to add command line flags.
   The aggregation to the command line options using a `pflag.FlagSet` is automated by the library.
 
@@ -49,6 +49,13 @@ This project provides a wrapper for the Kubernetes [Multi-CLuster Runtime Librar
 
   It is possible to establish, track and get triggered by cross-cluster or cross-namespace ownership relations.
 
+More detailed information is described for the following topics
+# - [Options](doc/options.md#options)
+# - [Clusters](doc/clusters.md#clusters)
+# - [Controller Manager](doc/manager.md#manager)
+# - [Controllers](doc/controllers.md#controllers)
+# - [Indices](doc/indices.md#indices)
+# - [Owner Handling](doc/owners.md#owners)
 
 ## Walkthrough
 
@@ -98,7 +105,7 @@ To support typed resource indices at the definition level, the resource must be 
 Because we want to replicate, we need access to two clusters, the main cluster (for the watch) of the controller is the source cluster (using the constant `SOURCE`). But we need a second one, the target cluster. This is specified by adding `UseCluster`, which declares additional clusters. 
 
 With `AddTrigger(controller.OwnerTrigger[*Resource]().OnCluster(controllers.TARGET))` 
-a watch on the target cluster is requested using the owner information on
+a watch on the target cluster is requested using the [owner information](doc/owners.md#owners) on
 a target resource to trigger the reconcilation on changes on the replica.
 
 Then we need to describe the reconcilation logic. This is done by providing a factory
@@ -276,7 +283,7 @@ It consists of three very simple delarative-like parts:
 
 4) And finally run the complete configuration
 
-   ```
+   ```go
    	err := ctrlmgmt.Setup("replicator", options, def, os.Args[1:]...)
    	if err == pflag.ErrHelp {
    		os.Exit(0)
@@ -412,7 +419,7 @@ If there is a status resource, it assumes, that there ia a field `Status`
 
 `Finalizer` and `FieldManger` fields describe the values that should/will be used by those purposes.
 
-An `OwnerHandler`can be used to maintain and query owner relationships. This handler
+An [`OwnerHandler`](doc/owners.md#owners) can be used to maintain and query owner relationships. This handler
 automatically handles cross-namespace and cross-cluster relationships. So, we can use this
 to describe the relationship between a replica and its original resource.
 
