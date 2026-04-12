@@ -25,18 +25,26 @@ type Definition interface {
 	flagutils.Options
 	flagutils.OptionSetProvider
 
-	WithScheme(scheme *runtime.Scheme) Definition
-	AddCluster(def ...cluster.Definition) Definition
-	AddComponent(def ...component.Definition) Definition
-	AddController(def ...controller.Definition) Definition
-	AddControllerRule(rules ...constraints.Constraint) Definition
-	AddIndex(def ...cacheindex.Definition) Definition
-
 	GetController(name string) controller.Definition
 
 	GetError() error
 	GetControllerManager(ctx context.Context, opts flagutils.OptionSetProvider) (ControllerManager, error)
 }
+
+// --- begin definition ---
+
+type CompositionInterface interface {
+	Definition
+
+	WithScheme(scheme *runtime.Scheme) CompositionInterface
+	AddCluster(def ...cluster.Definition) CompositionInterface
+	AddComponent(def ...component.Definition) CompositionInterface
+	AddController(def ...controller.Definition) CompositionInterface
+	AddControllerRule(rules ...constraints.Constraint) CompositionInterface
+	AddIndex(def ...cacheindex.Definition) CompositionInterface
+}
+
+// --- end definition ---
 
 type definition struct {
 	internal.Element
@@ -47,7 +55,9 @@ type definition struct {
 	controllers controller.Definitions
 }
 
-func Define(name, main string) Definition {
+var _ CompositionInterface = (*definition)(nil)
+
+func Define(name, main string) CompositionInterface {
 	d := &definition{
 		Element:     internal.NewElement(name),
 		clusters:    cluster.NewDefinitions(),
@@ -59,32 +69,32 @@ func Define(name, main string) Definition {
 	return d
 }
 
-func (d *definition) WithScheme(scheme *runtime.Scheme) Definition {
+func (d *definition) WithScheme(scheme *runtime.Scheme) CompositionInterface {
 	d.clusters.WithScheme(scheme)
 	return d
 }
 
-func (d *definition) AddCluster(def ...cluster.Definition) Definition {
+func (d *definition) AddCluster(def ...cluster.Definition) CompositionInterface {
 	d.clusters.Add(def...)
 	return d
 }
 
-func (d *definition) AddComponent(def ...component.Definition) Definition {
+func (d *definition) AddComponent(def ...component.Definition) CompositionInterface {
 	d.components.Add(def...)
 	return d
 }
 
-func (d *definition) AddController(def ...controller.Definition) Definition {
+func (d *definition) AddController(def ...controller.Definition) CompositionInterface {
 	d.controllers.Add(def...)
 	return d
 }
 
-func (d *definition) AddControllerRule(rules ...constraints.Constraint) Definition {
+func (d *definition) AddControllerRule(rules ...constraints.Constraint) CompositionInterface {
 	d.controllers.AddRule(rules...)
 	return d
 }
 
-func (d *definition) AddIndex(def ...cacheindex.Definition) Definition {
+func (d *definition) AddIndex(def ...cacheindex.Definition) CompositionInterface {
 	d.indices.Add(def...)
 	return d
 }

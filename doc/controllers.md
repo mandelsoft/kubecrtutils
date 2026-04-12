@@ -8,7 +8,8 @@
 Controllers bundle a reconciler for a main resource, some locally used indices and triggers. Triggers
 are watches on other resources (or clusters) triggering reconcilation of the main resource.
 
-### Controller Definitions
+### Definition
+<a id="controller-definitions"></a>
 
 Controllers can be defined with the following functions:
 
@@ -42,26 +43,23 @@ The complete interface is as follows:
 
 ```go
  
- type TypedDefinition[P kubecrtutils.ObjectPointer[T], T any] interface {
- 	Definition
+ type CompositionInterface[P kubecrtutils.ObjectPointer[T], T any] interface {
+ 	TypedDefinition[P, T]
  
- 	GetReconciler() ReconcilerFactory[P, T]
- 	GetTriggers() []ResourceTriggerDefinition
- 
- 	WithFinalizer(string) TypedDefinition[P, T]
- 	WithPredicates(preds ...predicate.Predicate) TypedDefinition[P, T]
+ 	WithFinalizer(string) CompositionInterface[P, T]
+ 	WithPredicates(preds ...predicate.Predicate) CompositionInterface[P, T]
  	// WithActivationConstraint declares additional activation rules
  	// relevant if this controller is activated.
- 	WithActivationConstraint(...constraints.Constraint) TypedDefinition[P, T]
- 	InGroup(...string) TypedDefinition[P, T]
+ 	WithActivationConstraint(...constraints.Constraint) CompositionInterface[P, T]
+ 	InGroup(...string) CompositionInterface[P, T]
  
- 	AddForeignIndex(i ...cacheindex.Definition) TypedDefinition[P, T]
- 	AddIndex(name string, indexerFunc cacheindex.IndexerFunc[P]) TypedDefinition[P, T]
- 	AddIndexByFactory(name string, indexerFunc cacheindex.TypedIndexerFactory[P]) TypedDefinition[P, T]
- 	ImportIndex(reference cacheindex.Reference) TypedDefinition[P, T]
- 	AddTrigger(trigger ...ResourceTriggerDefinition) TypedDefinition[P, T]
- 	UseCluster(name ...string) TypedDefinition[P, T]
- 	UseComponent(name ...string) TypedDefinition[P, T]
+ 	AddForeignIndex(i ...cacheindex.Definition) CompositionInterface[P, T]
+ 	AddIndex(name string, indexerFunc cacheindex.TypedIndexerFunc[P]) CompositionInterface[P, T]
+ 	AddIndexByFactory(name string, indexerFunc cacheindex.TypedIndexerFactory[P]) CompositionInterface[P, T]
+ 	ImportIndex(reference cacheindex.Reference) CompositionInterface[P, T]
+ 	AddTrigger(trigger ...ResourceTriggerDefinition) CompositionInterface[P, T]
+ 	UseCluster(name ...string) CompositionInterface[P, T]
+ 	UseComponent(name ...string) CompositionInterface[P, T]
  }
  
 ```
@@ -146,7 +144,7 @@ There are two different kind of indices:
 Indices use relative and absolute names. A relative name is the name as used in the declarations. The absolute name is composed by the local name and the name of the cluster it is defined for. 
 Indices are deduplicated, considering the base name, resource and cluster. If an index is defined on multiple clusters, that are all mapped to the same physical cluster, the index is created only once.
 
-In Go it is not possible to compare indexer functions, therefore, the base name of an index is meant to uniquely define the meaning independent of the used cluster. When orchestration index defining elements in the controller manager those *meanings* can be allinged with [mappings]({{index-mapping}})
+In Go it is not possible to compare indexer functions, therefore, the base name of an index is meant to uniquely define the meaning independent of the used cluster. When orchestration index defining elements in the controller manager those *meanings* can be aligned with [mappings](indices.md#mapping)
 
 When accessing indices from the controller. relative names can be used
 for indices on the main cluster of the controller.
@@ -164,14 +162,15 @@ A factory (`func(<ctx>, <logger>, <clusters>) (<indexer function>, error)` has a
 - *options*: use `cacheindex.OptionsFromContext`
 - *controller*: use `controller.ControllerFromContext`
 
-#### Mappings
+#### Mapping
+<a id="controller-mappings"></a>
 
 When controllers are orchestrated in a controller manager, their local names (for clusters, indices and components) can be mapped
 to names unique in the scope of the controller manager.
-This way, controller definition must not be globally aligned to orchestrated in a controller manager. Instead, the orchestrator
+This way, controller definitions must not be globally aligned to be orchestratable in a controller manager. Instead, the orchestrator
 is responsible to configure a globally consistent mapping of local names.
 
-A definition can wrapped into a `WithMappings(<definition>)` call.
+A definition can be wrapped into a `WithMappings(<definition>)` call.
 It provides some mapping methods:
 
 - `MapCluster(<local>, <global>)`: map local cluster names

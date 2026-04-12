@@ -9,7 +9,7 @@ import (
 )
 
 // FieldIndexer provides an indexer function for a given CEL expression.
-func FieldIndexer[T client.Object](expr string) (IndexerFunc[T], error) {
+func FieldIndexer[T client.Object](expr string) (TypedIndexerFunc[T], error) {
 	t := reflect.TypeFor[T]()
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem() // Ensure we have the struct type, not the pointer

@@ -4,7 +4,8 @@
 Controllers bundle a reconciler for a main resource, some locally used indices and triggers. Triggers
 are watches on other resources (or clusters) triggering reconcilation of the main resource.
 
-### Controller Definitions
+### Definition
+{{controller-definitions}}
 
 Controllers can be defined with the following functions:
 
@@ -28,7 +29,7 @@ We need both types, the pointer type of the resource (implementing `client.Objec
 The complete interface is as follows:
 
 ```go
- {{include}{$(root)/../controller/def.go}{controller definition}}
+ {{include}{$(root)/../controller/def.go}{definition}}
 ```
 
 #### Modifiers
@@ -104,14 +105,15 @@ A factory (`func(<ctx>, <logger>, <clusters>) (<indexer function>, error)` has a
 - *options*: use `cacheindex.OptionsFromContext`
 - *controller*: use `controller.ControllerFromContext`
 
-#### Mappings
+#### Mapping
+{{controller-mappings}}
 
 When controllers are orchestrated in a controller manager, their local names (for clusters, indices and components) can be mapped
 to names unique in the scope of the controller manager.
-This way, controller definition must not be globally aligned to orchestrated in a controller manager. Instead, the orchestrator
+This way, controller definitions must not be globally aligned to be orchestratable in a controller manager. Instead, the orchestrator
 is responsible to configure a globally consistent mapping of local names.
 
-A definition can wrapped into a `WithMappings(<definition>)` call.
+A definition can be wrapped into a `WithMappings(<definition>)` call.
 It provides some mapping methods:
 
 - `MapCluster(<local>, <global>)`: map local cluster names

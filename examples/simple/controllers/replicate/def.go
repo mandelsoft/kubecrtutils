@@ -29,7 +29,7 @@ func Controller() controller.Definition {
 
 // --- end definition ---
 
-func indexerFactory(ctx context.Context, logger logging.Logger, clusters cluster.Clusters) (cacheindex.IndexerFunc[*Resource], error) {
+func indexerFactory(ctx context.Context, logger logging.Logger, clusters cluster.Clusters) (cacheindex.TypedIndexerFunc[*Resource], error) {
 	opts := cacheindex.OptionsFromContext(ctx).(*controllers.Options)
 	return func(obj *Resource) []string {
 		annos := obj.GetAnnotations()

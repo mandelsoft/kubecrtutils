@@ -11,6 +11,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+// --- begin indexer func ---
+
+type IndexerFunc[T client.Object] = func(T) []string
+
+// --- end indexer func ---
+
 type IndexNames = plain.IndexNames
 
 type Index interface {

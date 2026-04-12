@@ -23,9 +23,13 @@ func DefinitionFromContext(ctx context.Context) Definition {
 	return generics.Cast[Definition](ctx.Value("component"))
 }
 
+// --- begin factory ---
+
 type Factory interface {
-	Apply(ctx context.Context, base *Base) (Component, error)
+	CreateComponent(ctx context.Context, comp Component) (ComponentImplementation, error)
 }
+
+// --- end factory ---
 
 type Definition = interface {
 	flagutils.Options
@@ -45,6 +49,19 @@ type Definition = interface {
 	GetOptions() flagutils.Options
 }
 
+// --- begin definition ---
+
+type CompositionInterface interface {
+	Definition
+	UseCluster(name ...string) CompositionInterface
+	UseComponent(name ...string) CompositionInterface
+	WithActivationConstraint(constraints ...constraints.Constraint) CompositionInterface
+	ImportIndex(def cacheindex.Reference) CompositionInterface
+	AddForeignIndex(indices ...cacheindex.Definition) CompositionInterface
+}
+
+// --- end definition ---
+
 type _definition struct {
 	internal.Element
 	internal.ErrorContainer
@@ -56,7 +73,7 @@ type _definition struct {
 	factory Factory
 }
 
-var _ Definition = (*_definition)(nil)
+var _ CompositionInterface = (*_definition)(nil)
 
 func Define(name string, fac Factory) *_definition {
 	return &_definition{
@@ -70,22 +87,22 @@ func Define(name string, fac Factory) *_definition {
 	}
 }
 
-func (d *_definition) UseCluster(name ...string) *_definition {
+func (d *_definition) UseCluster(name ...string) CompositionInterface {
 	d.DefaultConsumer.UseCluster(name...)
 	return d
 }
 
-func (d *_definition) UseComponent(name ...string) *_definition {
+func (d *_definition) UseComponent(name ...string) CompositionInterface {
 	d.DefaultConsumer.UseComponent(name...)
 	return d
 }
 
-func (d *_definition) WithActivationConstraint(constraints ...constraints.Constraint) *_definition {
+func (d *_definition) WithActivationConstraint(constraints ...constraints.Constraint) CompositionInterface {
 	d.constraints.Add(constraints...)
 	return d
 }
 
-func (d *_definition) ImportIndex(def cacheindex.Reference) *_definition {
+func (d *_definition) ImportIndex(def cacheindex.Reference) CompositionInterface {
 	if d.imports.Get(def.GetName()) != nil || d.foreign.Get(def.GetName()) != nil {
 		d.AddError(fmt.Errorf("duplicate dedinition of index %q", def.GetName()))
 	} else {
@@ -95,7 +112,7 @@ func (d *_definition) ImportIndex(def cacheindex.Reference) *_definition {
 	return d
 }
 
-func (d *_definition) AddForeignIndex(indices ...cacheindex.Definition) *_definition {
+func (d *_definition) AddForeignIndex(indices ...cacheindex.Definition) CompositionInterface {
 	for _, i := range indices {
 		if d.imports.Get(i.GetName()) != nil || d.foreign.Get(i.GetName()) != nil {
 			d.AddError(fmt.Errorf("duplicate dedinition of index %q", i.GetName()))
@@ -201,20 +218,19 @@ func (d *_definition) Apply(ctx context.Context, m mapping.ControllerMappings, m
 		return err
 	}
 
-	b := &Base{
+	b := &_component{
 		Logger:   logger,
 		def:      d,
-		self:     nil,
 		clusters: clusters,
 		comps:    comps,
 		indices:  indices,
 	}
-	c, err := d.factory.Apply(ctx, b)
+	c, err := d.factory.CreateComponent(ctx, b)
 	if err != nil {
 		return err
 	}
-	b.self = c
-	err = mgr.GetComponents().Add(c)
+	b.impl = c
+	err = mgr.GetComponents().Add(b)
 	if err != nil {
 		return err
 	}

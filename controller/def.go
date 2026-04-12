@@ -57,31 +57,35 @@ type IndexerFactory[T client.Object] = cacheindex.TypedIndexerFactory[T]
 
 ////////////////////////////////////////////////////////////////////////////////
 
-// --- begin controller definition ---
+// --- begin definition ---
+
+type CompositionInterface[P kubecrtutils.ObjectPointer[T], T any] interface {
+	TypedDefinition[P, T]
+
+	WithFinalizer(string) CompositionInterface[P, T]
+	WithPredicates(preds ...predicate.Predicate) CompositionInterface[P, T]
+	// WithActivationConstraint declares additional activation rules
+	// relevant if this controller is activated.
+	WithActivationConstraint(...constraints.Constraint) CompositionInterface[P, T]
+	InGroup(...string) CompositionInterface[P, T]
+
+	AddForeignIndex(i ...cacheindex.Definition) CompositionInterface[P, T]
+	AddIndex(name string, indexerFunc cacheindex.TypedIndexerFunc[P]) CompositionInterface[P, T]
+	AddIndexByFactory(name string, indexerFunc cacheindex.TypedIndexerFactory[P]) CompositionInterface[P, T]
+	ImportIndex(reference cacheindex.Reference) CompositionInterface[P, T]
+	AddTrigger(trigger ...ResourceTriggerDefinition) CompositionInterface[P, T]
+	UseCluster(name ...string) CompositionInterface[P, T]
+	UseComponent(name ...string) CompositionInterface[P, T]
+}
+
+// --- end definition ---
 
 type TypedDefinition[P kubecrtutils.ObjectPointer[T], T any] interface {
 	Definition
 
 	GetReconciler() ReconcilerFactory[P, T]
 	GetTriggers() []ResourceTriggerDefinition
-
-	WithFinalizer(string) TypedDefinition[P, T]
-	WithPredicates(preds ...predicate.Predicate) TypedDefinition[P, T]
-	// WithActivationConstraint declares additional activation rules
-	// relevant if this controller is activated.
-	WithActivationConstraint(...constraints.Constraint) TypedDefinition[P, T]
-	InGroup(...string) TypedDefinition[P, T]
-
-	AddForeignIndex(i ...cacheindex.Definition) TypedDefinition[P, T]
-	AddIndex(name string, indexerFunc cacheindex.IndexerFunc[P]) TypedDefinition[P, T]
-	AddIndexByFactory(name string, indexerFunc cacheindex.TypedIndexerFactory[P]) TypedDefinition[P, T]
-	ImportIndex(reference cacheindex.Reference) TypedDefinition[P, T]
-	AddTrigger(trigger ...ResourceTriggerDefinition) TypedDefinition[P, T]
-	UseCluster(name ...string) TypedDefinition[P, T]
-	UseComponent(name ...string) TypedDefinition[P, T]
 }
-
-// --- end controller definition ---
 
 type _definition[P kubecrtutils.ObjectPointer[T], T any] struct {
 	internal.Element
@@ -101,11 +105,11 @@ type _definition[P kubecrtutils.ObjectPointer[T], T any] struct {
 	finalizer string
 }
 
-func DefineByFunc[P kubecrtutils.ObjectPointer[T], T any](name string, cluster string, fac ReconcilerFactoryFunc[P, T]) TypedDefinition[P, T] {
+func DefineByFunc[P kubecrtutils.ObjectPointer[T], T any](name string, cluster string, fac ReconcilerFactoryFunc[P, T]) CompositionInterface[P, T] {
 	return Define[P, T](name, cluster, fac)
 }
 
-func Define[P kubecrtutils.ObjectPointer[T], T any](name string, cluster string, fac ReconcilerFactory[P, T]) TypedDefinition[P, T] {
+func Define[P kubecrtutils.ObjectPointer[T], T any](name string, cluster string, fac ReconcilerFactory[P, T]) CompositionInterface[P, T] {
 	d := &_definition[P, T]{
 		Element:         internal.NewElement(name),
 		ErrorContainer:  *internal.NewErrorContainer(fmt.Sprintf("controller %s", name)),
@@ -123,37 +127,37 @@ func Define[P kubecrtutils.ObjectPointer[T], T any](name string, cluster string,
 	return d
 }
 
-func (d *_definition[P, T]) InGroup(group ...string) TypedDefinition[P, T] {
+func (d *_definition[P, T]) InGroup(group ...string) CompositionInterface[P, T] {
 	d.groups.Add(group...)
 	return d
 }
 
-func (d *_definition[P, T]) WithPredicates(preds ...predicate.Predicate) TypedDefinition[P, T] {
+func (d *_definition[P, T]) WithPredicates(preds ...predicate.Predicate) CompositionInterface[P, T] {
 	d.predicates = append(d.predicates, preds...)
 	return d
 }
 
-func (d *_definition[P, T]) WithFinalizer(s string) TypedDefinition[P, T] {
+func (d *_definition[P, T]) WithFinalizer(s string) CompositionInterface[P, T] {
 	d.finalizer = s
 	return d
 }
 
-func (d *_definition[P, T]) UseCluster(name ...string) TypedDefinition[P, T] {
+func (d *_definition[P, T]) UseCluster(name ...string) CompositionInterface[P, T] {
 	d.DefaultConsumer.UseCluster(name...)
 	return d
 }
 
-func (d *_definition[P, T]) UseComponent(name ...string) TypedDefinition[P, T] {
+func (d *_definition[P, T]) UseComponent(name ...string) CompositionInterface[P, T] {
 	d.DefaultConsumer.UseComponent(name...)
 	return d
 }
 
-func (d *_definition[P, T]) WithActivationConstraint(constraints ...constraints.Constraint) TypedDefinition[P, T] {
+func (d *_definition[P, T]) WithActivationConstraint(constraints ...constraints.Constraint) CompositionInterface[P, T] {
 	d.constraints.Add(constraints...)
 	return d
 }
 
-func (d *_definition[P, T]) AddForeignIndex(indices ...cacheindex.Definition) TypedDefinition[P, T] {
+func (d *_definition[P, T]) AddForeignIndex(indices ...cacheindex.Definition) CompositionInterface[P, T] {
 	for _, i := range indices {
 		name := i.GetName()
 		if d.indices.Get(name) != nil || d.imports.Get(name) != nil || d.foreign.Get(name) != nil {
@@ -165,7 +169,7 @@ func (d *_definition[P, T]) AddForeignIndex(indices ...cacheindex.Definition) Ty
 	return d
 }
 
-func (d *_definition[P, T]) AddIndex(name string, indexerFunc cacheindex.IndexerFunc[P]) TypedDefinition[P, T] {
+func (d *_definition[P, T]) AddIndex(name string, indexerFunc cacheindex.TypedIndexerFunc[P]) CompositionInterface[P, T] {
 	n := cacheindex.ComposeName(name, d.cluster)
 	if d.indices.Get(n) != nil || d.imports.Get(n) != nil || d.foreign.Get(n) != nil {
 		d.AddError(fmt.Errorf("duplicate definition of index %q[%s]", name, n))
@@ -178,7 +182,7 @@ func (d *_definition[P, T]) AddIndex(name string, indexerFunc cacheindex.Indexer
 	return d
 }
 
-func (d *_definition[P, T]) AddIndexByFactory(name string, indexerFunc IndexerFactory[P]) TypedDefinition[P, T] {
+func (d *_definition[P, T]) AddIndexByFactory(name string, indexerFunc IndexerFactory[P]) CompositionInterface[P, T] {
 	n := cacheindex.ComposeName(name, d.cluster)
 	if d.indices.Get(n) != nil || d.imports.Get(n) != nil || d.foreign.Get(n) != nil {
 		d.AddError(fmt.Errorf("duplicate definition of index %q[%s]", name, n))
@@ -191,7 +195,7 @@ func (d *_definition[P, T]) AddIndexByFactory(name string, indexerFunc IndexerFa
 	return d
 }
 
-func (d *_definition[P, T]) ImportIndex(def cacheindex.Reference) TypedDefinition[P, T] {
+func (d *_definition[P, T]) ImportIndex(def cacheindex.Reference) CompositionInterface[P, T] {
 	name := def.GetName()
 	if d.indices.Get(name) != nil || d.imports.Get(def.GetName()) != nil || d.foreign.Get(def.GetName()) != nil {
 		d.AddError(fmt.Errorf("duplicate dedinition of index %q", def.GetName()))
@@ -202,7 +206,7 @@ func (d *_definition[P, T]) ImportIndex(def cacheindex.Reference) TypedDefinitio
 	return d
 }
 
-func (d *_definition[P, T]) AddTrigger(trigger ...ResourceTriggerDefinition) TypedDefinition[P, T] {
+func (d *_definition[P, T]) AddTrigger(trigger ...ResourceTriggerDefinition) CompositionInterface[P, T] {
 	for _, t := range trigger {
 		d.triggers = append(d.triggers, t)
 		if t.GetCluster() != "" {

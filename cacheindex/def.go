@@ -49,7 +49,7 @@ func Ref[P kubecrtutils.ObjectPointer[T], T any](name string, target string) Ref
 	}}
 }
 
-func Define[P kubecrtutils.ObjectPointer[T], T any](name string, target string, idxfunc IndexerFunc[P]) TypedDefinition[P, T] {
+func Define[P kubecrtutils.ObjectPointer[T], T any](name string, target string, idxfunc TypedIndexerFunc[P]) TypedDefinition[P, T] {
 	return &_definition[P, T]{
 		Element:                internal.NewElement(ComposeName(name, target)),
 		DefaultClusterConsumer: *mapping.NewDefaultClusterConsumer(target),

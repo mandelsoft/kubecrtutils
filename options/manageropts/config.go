@@ -7,6 +7,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
+// --- begin config interface ---
+
 // ConfigurationProvider is used to modify the manager options used to
 // create a new manager.
 // Such objects can be set at the Options object to preprocess the configuration
@@ -15,3 +17,5 @@ import (
 type ConfigurationProvider interface {
 	Configure(ctx context.Context, config *ctrl.Options, opts flagutils.OptionSet) error
 }
+
+// --- end config interface ---

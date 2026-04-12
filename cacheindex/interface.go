@@ -13,10 +13,10 @@ type Clusters = types.Clusters
 
 type ClustersAware[T any] = types.ClustersAware[T]
 
-type IndexerFunc[T client.Object] = types.IndexerFunc[T]
+type IndexerFunc = client.IndexerFunc
 type IndexerFactory = types.IndexerFactory
 
-type TypedIndexerFunc[P client.Object] = func(P) []string
+type TypedIndexerFunc[P client.Object] = types.IndexerFunc[P]
 type TypedIndexerFactory[P client.Object] = ClustersAware[TypedIndexerFunc[P]]
 
 type Definition = types.IndexDefinition

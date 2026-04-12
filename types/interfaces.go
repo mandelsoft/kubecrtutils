@@ -16,8 +16,6 @@ type DefinitionProvider[D any] interface {
 	GetDefinition() D
 }
 
-type IndexerFunc[T client.Object] = func(T) []string
-
 type ObjectMapper[T any, R any] = func(ctx context.Context, obj T) []R
 
 type ControllerAware[T any] = func(ctx context.Context, cntr Controller) (T, error)

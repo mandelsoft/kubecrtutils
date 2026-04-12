@@ -65,7 +65,7 @@ example: we want to create a set of controllers orchestrated into a
 controller manager replicating config resources with a particular annotation
 into another custer.
 
-There are two directitions:
+There are two directions:
 - *from source to target (called up)*
 
   here typically the spec part of an object is replicated (in our example the complete object)

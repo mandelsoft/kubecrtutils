@@ -13,15 +13,32 @@ type ComponentFilter interface {
 	GetUsedComponents(ConstraintContext) ComponentNames
 }
 
+// --- begin component ---
+
 type Component interface {
 	logging.Logger
 
 	GetName() string
-	GetEffective() Component
 
+	GetCluster(name string) ClusterEquivalent
 	GetComponent(name string) Component
 	GetIndex(name string) Index
+
+	GetIndices() Indices
+	GetClusters() Clusters
+
+	GetImplementation() ComponentImplementation
 }
+
+// --- end component ----
+
+// --- begin component implementation ---
+
+type ComponentImplementation interface {
+	GetComponent() Component
+}
+
+// --- end component implementation ---
 
 type Components interface {
 	internal.Group[Component]

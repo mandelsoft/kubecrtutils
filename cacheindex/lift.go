@@ -13,7 +13,7 @@ func Lift[T any](f T) ClustersAware[T] {
 	}
 }
 
-func ConvertIndexerFunc[T client.Object](f IndexerFunc[T]) client.IndexerFunc {
+func ConvertIndexerFunc[T client.Object](f TypedIndexerFunc[T]) client.IndexerFunc {
 	return func(object client.Object) []string {
 		return f(any(object).(T))
 	}

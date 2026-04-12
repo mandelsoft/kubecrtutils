@@ -195,7 +195,8 @@ provide an appropriate configuration object, including the required rest config.
 
 This is done by implementing the [`Options` interface](options.md#options) by the `Rules` object aggregating the rule set for a dedicated cluster.
 
-### Cluster Definitions
+### Definition
+<a id="cluster-definitions"></a>
 
 Logical clusters (cluster equivalents) can be defined using two definition flavors:
 
@@ -207,9 +208,19 @@ Logical clusters (cluster equivalents) can be defined using two definition flavo
   Future development, will change this by introducing a fleet type option, if multiple fleet types should be possible.
 
 #### Modifiers
+<a id="cluster-modifiers"></a>
 
 A cluster definition allows some modifiers:
 - `.WithFallback(<name>)`: If the logical cluster is not configured by the command line, a fallback cluster is used instead. If no fallback is configured, the cluster is required to be configured.
+
+#### Mapping
+<a id="cluster-mappings"></a>
+
+For cluster definitions there is no explicit `.WithMappings` call.
+Nevertheless, there is some other kind of mapping feature.
+
+When defining clusters at the level of the [controller manager](manager.md#manager) cluster definitions can basically be mapped to each other by defining [fallbacks](#cluster-modifiers).
+All definitions are used, but when evaluating the command line options, undefined clusters can be mapped to other ones, according to their fallback definitions.
 
 #### Remarks
 
