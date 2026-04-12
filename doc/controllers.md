@@ -191,8 +191,8 @@ All methods on a `Clusterequivalent` take a context and determine the effective 
 
 Above this low-level interface, there are three higer level abstractions:
 
-- using a request object bases reconcilation logic (`support.NewByLogic`)
-- using a request base reconciler using various factories (`support.New`)
+- using a request object bases reconcilation logic (`logic.New`)
+- using a request base reconciler using various factories (`factories.New`)
 - using low-level request object based reconciler (`reconciler.New`)
 
 All those wrappers bundle the reconcilation environment for 
@@ -233,9 +233,9 @@ by providing a `reconciler.BaseRequest`, which can be embedded into the final re
 There is a second more general flavor pair `reconciler.NewWithOptions`/`reconciler.DefaultRequestFactoryFuncWithOptions`, which allows to specify an `Options` type, which is added to
 the reconciler factory and forwarded to the `baseRequest`-
 
-##### `support.New`
+##### `factories.New`
 
-On top of this abstraction `support.New` uses three separate factory functions (`Optionfactory`, `SettingsFactory`, and `RequestFactory`),
+On top of this abstraction `factories.New` uses three separate factory functions (`Optionfactory`, `SettingsFactory`, and `RequestFactory`),
 for options, the shared `Settings` and one for the request creation to
 provide an appropriate factory and reconciler.
 
@@ -252,9 +252,9 @@ type Factory[O flagutils.Options, S any, P kubecrtutils.ObjectPointer[T], T any]
 
 and is implemented by a `DefaultFactory` using the factory functions.
 
-A second flavor `support.NewByFactory` directly take such an implementation
+A second flavor `factories.NewByFactory` directly take such an implementation
 
-##### `support.NewByLogic`
+##### `logic.New`
 
 This abstraction is based on the previous one and simplifies all the factory functions.
 
@@ -270,7 +270,9 @@ type ReconcilationLogic[O flagutils.Options, S any, P kubecrtutils.ObjectPointer
 }
 ```
 
-Is uses a standard implementation for the request, which forwards
-the logic implementation to the singleton logic object.
+A second flavor `NewWithOptions` addtionally accepts a type parameter for the `Options` type.
+
+Both flavors use a standard implementation for the request, which does not be implemented separately anymore. It forwards
+the logic implementation to the shared logic object by passing the request as argument.
 
 This flavor is finally used by ur [walkthrough example](../README.md#walkthrough)

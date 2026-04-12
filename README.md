@@ -92,7 +92,7 @@ func Controller() controller.Definition {
 	return controller.Define[*Resource](
 		"replicate",
 		controllers.SOURCE,
-		support.NewByLogic[*controllers.Options, *controllers.Settings, *Resource](&ReconcilationLogic{}),
+		logic.New[*controllers.Options, *controllers.Settings, *Resource](&ReconcilationLogic{}),
 	).
 		UseCluster(controllers.TARGET).
 		AddTrigger(controller.OwnerTrigger[*Resource]().OnCluster(controllers.TARGET)).
@@ -117,7 +117,7 @@ able to create a regular `reconcile.Reconciler` from the controller runtime, whe
 
 This factory just returns a regular cluster-runtime reconciler featuring the logic. But we want to
 use some more comfort and decide to use a support wrapper by using a standard 
-factory working on a `support.Request` object. For every reconcilation, such an object is created holding all necessary information required to implement the reconcilation step.
+factory working on a `logic.Request` object. For every reconcilation, such an object is created holding all necessary information required to implement the reconcilation step.
 
 Part of this information is derived from the controller settings and (potential additional options).
 Here, for example, we use the effective source and target cluster. These settings are bundled
@@ -173,7 +173,7 @@ func (o *Options) Validate(ctx context.Context, opts flagutils.OptionSet, v flag
 We will use a special annotation used to hold a *replication class*. 
 Only objects with a dedicated value here, will be replicated.
 
-All this information is packed into the call to `support.NewByLogic` in addition to
+All this information is packed into the call to `logic.NewByLogic` in addition to
 our implementation object for the reconcilation logic (`ReconcilationLogic`). The method
 then provides a regular factory for the cluster runtime reconciler based
 an on object implementing the following interface:
@@ -192,28 +192,6 @@ This object is two-folded:
 - It provides the `Settings` from and for the concrete instantiation. This information is
   shared among all reconcilation requests and finally accessible from the used `Request`
   object.
-
-  ```go
-  
-  type Request = *support.Request[*controllers.Options, *controllers.Settings, *Resource, Resource]
-  
-  type ReconcilationLogic struct {
-  }
-  
-  func (r *ReconcilationLogic) CreateSettings(ctx context.Context, o *controllers.Options, c controller.TypedController[*Resource, Resource]) (*controllers.Settings, error) {
-  	s := &controllers.Settings{
-  		Source:  c.GetClusters().Get(controllers.SOURCE),
-  		Target:  c.GetClusters().Get(controllers.TARGET).AsCluster(),
-  		Mapping: controllers.NewMapping(),
-  	}
-  
-  	log := c.GetLogger()
-  	log.Info("using source {{type}} {{name}}[{{info}}]", "type", s.Source.GetTypeInfo(), "name", s.Source.GetEffective().GetName(), "info", s.Source.GetTypeInfo())
-  	log.Info("using target {{type}} {{name}}[{{info}}]", "type", s.Target.GetTypeInfo(), "name", s.Target.GetEffective().GetName(), "info", s.Target.GetTypeInfo())
-  	return s, nil
-  }
-  
-  ```
 
 - Implement the reconcilation interface to execute the reconcilation logic for a particular
   request. We will have a look at the implementation [later](#logic).
@@ -354,13 +332,13 @@ The reconcilatiuon itself is spilt into three methods:
 - `ReconcileDeleting` handle deletion while finalizers are still set
 - `ReconcileDeleted` handle the final deletion
 
-All three methods gain access to the reconcilatuon context by a `support.Request`
+All three methods gain access to the reconcilatuon context by a `logic.Request`
 object. It looks like this:
 
 ```go
 type Request[O flagutils.Options, S any, P kubecrtutils.ObjectPointer[T], T any] struct {
 	*reconciler.BaseRequest[P]
-	Reconciler *Reconciler[O, S, P, T]
+	Reconciler *factories.Reconciler[O, S, P, T]
 	logic      ReconcilationLogic[O, S, P, T]
 }
 ```

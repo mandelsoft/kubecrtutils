@@ -176,7 +176,7 @@ func (m *_cmappings) ApplyTo(add ControllerMappings) ControllerMappings {
 		return m
 	}
 	return &_cmappings{
-		indices:    m.indices.ApplyTo(add.ClusterMappings()),
+		indices:    m.indices.ApplyTo(add.IndexMappings()),
 		components: m.components.ApplyTo(add.ComponentMappings()),
 		clusters:   m.clusters.ApplyTo(add.ClusterMappings()),
 	}

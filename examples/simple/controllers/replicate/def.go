@@ -4,7 +4,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/cacheindex"
 	"github.com/mandelsoft/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubecrtutils/controller"
-	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconciler/support"
+	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconciler/logic"
 	"github.com/mandelsoft/kubecrtutils/examples/simple/controllers"
 	"github.com/mandelsoft/logging"
 	"golang.org/x/net/context"
@@ -19,7 +19,7 @@ func Controller() controller.Definition {
 	return controller.Define[*Resource](
 		"replicate",
 		controllers.SOURCE,
-		support.NewByLogic[*controllers.Options, *controllers.Settings, *Resource](&ReconcilationLogic{}),
+		logic.New[*controllers.Options, *controllers.Settings, *Resource](&ReconcilationLogic{}),
 	).
 		UseCluster(controllers.TARGET).
 		AddTrigger(controller.OwnerTrigger[*Resource]().OnCluster(controllers.TARGET)).

@@ -103,7 +103,7 @@ able to create a regular `reconcile.Reconciler` from the controller runtime, whe
 
 This factory just returns a regular cluster-runtime reconciler featuring the logic. But we want to
 use some more comfort and decide to use a support wrapper by using a standard 
-factory working on a `support.Request` object. For every reconcilation, such an object is created holding all necessary information required to implement the reconcilation step.
+factory working on a `logic.Request` object. For every reconcilation, such an object is created holding all necessary information required to implement the reconcilation step.
 
 Part of this information is derived from the controller settings and (potential additional options).
 Here, for example, we use the effective source and target cluster. These settings are bundled
@@ -126,23 +126,19 @@ an `Options` type passed as type parameter to our declaration method (`controlle
 We will use a special annotation used to hold a *replication class*. 
 Only objects with a dedicated value here, will be replicated.
 
-All this information is packed into the call to `support.NewByLogic` in addition to
+All this information is packed into the call to `logic.NewByLogic` in addition to
 our implementation object for the reconcilation logic (`ReconcilationLogic`). The method
 then provides a regular factory for the cluster runtime reconciler based
 an on object implementing the following interface:
 
 ```go
-{{include}{$(root)/controller/controllerutils/reconciler/support/reconciler.go}{reconcilation logic}}
+{{include}{$(root)/controller/controllerutils/reconciler/logic/request.go}{reconcilation logic}}
 ```
 
 This object is two-folded:
 - It provides the `Settings` from and for the concrete instantiation. This information is
   shared among all reconcilation requests and finally accessible from the used `Request`
   object.
-
-  ```go
-  {{include}{$(simple)/controllers/replicate/logic.go}{reconcilation logic}}
-  ```
 
 - Implement the reconcilation interface to execute the reconcilation logic for a particular
   request. We will have a look at the implementation [later]({{logic}}).
@@ -214,7 +210,7 @@ a `Request`-based standard implementation.
 The reconcilation logic is implemented by an object implementing the interface 
 
 ```go
-{{include}{$(root)/controller/controllerutils/reconciler/support/reconciler.go}{reconcilation logic}}
+{{include}{$(root)/controller/controllerutils/reconciler/logic/request.go}{reconcilation logic}}
 ```
 
 As has been seen earlier, it is used to provide a share `Settings` object holding
@@ -225,17 +221,17 @@ The reconcilatiuon itself is spilt into three methods:
 - `ReconcileDeleting` handle deletion while finalizers are still set
 - `ReconcileDeleted` handle the final deletion
 
-All three methods gain access to the reconcilatuon context by a `support.Request`
+All three methods gain access to the reconcilatuon context by a `logic.Request`
 object. It looks like this:
 
 ```go
-{{include}{$(root)/controller/controllerutils/reconciler/support/reconciler.go}{request}}
+{{include}{$(root)/controller/controllerutils/reconciler/logic/request.go}{request}}
 ```
 
 which provides access to some shared information found in the `Reconciler` object.
 
 ```go
-{{include}{$(root)/controller/controllerutils/reconciler/support/reconciler.go}{reconciler}}
+{{include}{$(root)/controller/controllerutils/reconciler/factories/reconciler.go}{reconciler}}
 ```
 
 Here, you find your `Settings` and `Options`.
@@ -243,13 +239,13 @@ Here, you find your `Settings` and `Options`.
 The dynamic information is found in the embedded `BaseRequest` field. It provides the interface
 
 ```go
-{{include}{$(root)/controller/controllerutils/reconciler/reconciler.go}{request}}
+{{include}{$(root)/controller/controllerutils/reconciler/request.go}{request}}
 ```
 
 and some important direct fields:
 
 ```go
-{{include}{$(root)/controller/controllerutils/reconciler/reconciler.go}{request fields}}
+{{include}{$(root)/controller/controllerutils/reconciler/request.go}{request fields}}
 ```
 
 If there is a status resource, it assumes, that there ia a field `Status`

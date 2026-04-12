@@ -6,7 +6,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubecrtutils/controller"
 	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconcile"
-	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconciler/support"
+	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconciler/logic"
 	"github.com/mandelsoft/kubecrtutils/examples/simple/controllers"
 	"github.com/mandelsoft/kubecrtutils/objutils"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -16,7 +16,7 @@ import (
 
 // --- begin reconcilation logic ---
 
-type Request = *support.Request[*controllers.Options, *controllers.Settings, *Resource, Resource]
+type Request = *logic.Request[*controllers.Options, *controllers.Settings, *Resource, Resource]
 
 type ReconcilationLogic struct {
 }

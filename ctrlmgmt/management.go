@@ -101,7 +101,7 @@ func NewControllerManagerByOpts(ctx context.Context, opts flagutils.OptionSetPro
 	iopts := cacheindex.From(opts)
 	if iopts != nil && iopts.Len() > 0 {
 		logger.Info("configure global indices...")
-		err = iopts.CreateIndices(ctx, nil, cm)
+		err = iopts.CreateIndices(ctx, mappings, cm)
 		if err != nil {
 			return nil, fmt.Errorf("settingup indices: %w", err)
 		}
@@ -110,7 +110,7 @@ func NewControllerManagerByOpts(ctx context.Context, opts flagutils.OptionSetPro
 	coopts := component.From(opts)
 	if coopts != nil && coopts.Len() > 0 {
 		logger.Info("configure component indices...")
-		err = coopts.CreateIndices(ctx, nil, cm)
+		err = coopts.CreateIndices(ctx, mappings, cm)
 		if err != nil {
 			return nil, fmt.Errorf("setting up component indices: %w", err)
 		}

@@ -1,4 +1,4 @@
-package support
+package logic
 
 import (
 	"context"
@@ -8,9 +8,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/controller"
 	myreconcile "github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconcile"
 	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconciler"
-	"github.com/mandelsoft/kubecrtutils/owner"
-	"github.com/mandelsoft/logging"
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconciler/factories"
 )
 
 // --- begin reconcilation logic ---
@@ -32,7 +30,7 @@ type ReconcilationLogicWithOptions[F flagutils.Options, S any, P kubecrtutils.Ob
 // --- begin request ---
 type Request[O flagutils.Options, S any, P kubecrtutils.ObjectPointer[T], T any] struct {
 	*reconciler.BaseRequest[P]
-	Reconciler *Reconciler[O, S, P, T]
+	Reconciler *factories.Reconciler[O, S, P, T]
 	logic      ReconcilationLogic[O, S, P, T]
 }
 
@@ -46,28 +44,4 @@ func (r *Request[O, S, P, T]) ReconcileDeleting() myreconcile.Problem {
 }
 func (r *Request[O, S, P, T]) ReconcileDeleted() myreconcile.Problem {
 	return r.logic.ReconcileDeleted(r)
-}
-
-type OwnerHandler = owner.Handler
-
-// --- begin reconciler ---
-
-// Reconciler includes the options and setting field.
-type Reconciler[O flagutils.Options, S any, P kubecrtutils.ObjectPointer[T], T any] struct {
-	logging.Logger
-	Controller   controller.TypedController[P, T]
-	GroupKind    schema.GroupKind
-	FieldManager string
-	Finalizer    string
-	OwnerHandler
-	Options  O
-	Settings S
-
-	request RequestFactory[O, S, P, T]
-}
-
-// --- end reconciler ---
-
-func (r *Reconciler[O, S, P, T]) Request(def *reconciler.BaseRequest[P]) reconciler.ReconcileRequest[P] {
-	return r.request(def, r)
 }

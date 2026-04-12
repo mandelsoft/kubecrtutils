@@ -1,4 +1,4 @@
-package support
+package factories
 
 import (
 	"context"
@@ -68,35 +68,6 @@ func NewByFactory[O flagutils.Options, S any, P kubecrtutils.ObjectPointer[T], T
 // as options. Therefore, the options are not sharable.
 func NewByFactoryWithOptions[S any, P kubecrtutils.ObjectPointer[T], T any, F FactoryWithOptions[F, S, P, T]](fac F) *ReconcilerFactory[F, S, P, T] {
 	return New[F, S, P, T](func() F { return fac }, fac.CreateSettings, fac.CreateRequest)
-}
-
-// NewByLogicis like New but uses a default option creator for the options and the a ReconcilationLogic.
-func NewByLogic[O flagutils.Options, S any, P kubecrtutils.ObjectPointer[T], T any, F ReconcilationLogic[O, S, P, T]](fac F) *ReconcilerFactory[O, S, P, T] {
-	return New[O, S, P, T](
-		generics.ObjectFor[O],
-		fac.CreateSettings,
-		func(def *reconciler.BaseRequest[P], r *Reconciler[O, S, P, T]) reconciler.ReconcileRequest[P] {
-			return &Request[O, S, P, T]{
-				BaseRequest: def,
-				Reconciler:  r,
-				logic:       fac,
-			}
-		})
-}
-
-// NewByLogicWithOptions is like NewByLogic, but uses the factory instance
-// as options. Therefore, the options are not sharable.
-func NewByLogicWithOptions[S any, P kubecrtutils.ObjectPointer[T], T any, F ReconcilationLogicWithOptions[F, S, P, T]](fac F) *ReconcilerFactory[F, S, P, T] {
-	return New[F, S, P, T](
-		func() F { return fac },
-		fac.CreateSettings,
-		func(def *reconciler.BaseRequest[P], r *Reconciler[F, S, P, T]) reconciler.ReconcileRequest[P] {
-			return &Request[F, S, P, T]{
-				BaseRequest: def,
-				Reconciler:  r,
-				logic:       fac,
-			}
-		})
 }
 
 func (r *ReconcilerFactory[S, P, T, F]) ModifyFinalizer(f string) string {
