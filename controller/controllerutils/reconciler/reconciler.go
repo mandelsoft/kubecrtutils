@@ -74,10 +74,14 @@ type Request[T client.Object] interface {
 
 // --- end request ---
 
+// --- begin reconcile request ----
+
 type ReconcileRequest[T client.Object] interface {
 	Request[T]
 	ReconcilationLogic
 }
+
+// --- end reconcile request ----
 
 type BaseRequest[T client.Object] struct {
 	cluster.Cluster

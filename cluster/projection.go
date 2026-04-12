@@ -19,3 +19,14 @@ func (cl *_clusters) Map(mapping mapping.Mappings, names ClusterNames) (Clusters
 	}
 	return n, nil
 }
+
+func CreateMappingsProvidedBy(cs Clusters) mapping.Mappings {
+	m := mapping.Mappings{}
+
+	for n, c := range cs.Elements {
+		if n != c.GetEffective().GetName() {
+			m.Add(n, c.GetEffective().GetName())
+		}
+	}
+	return m
+}

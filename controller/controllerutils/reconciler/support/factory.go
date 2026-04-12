@@ -19,14 +19,19 @@ import (
 
 type None = reconciler.None
 
+type OptionFactory[O flagutils.Options] = func() O
 type SettingsFactory[O flagutils.Options, S any, P kubecrtutils.ObjectPointer[T], T any] func(ctx context.Context, o O, controller controller.TypedController[P, T]) (S, error)
 type RequestFactory[O flagutils.Options, S any, P kubecrtutils.ObjectPointer[T], T any] func(*reconciler.BaseRequest[P], *Reconciler[O, S, P, T]) reconciler.ReconcileRequest[P]
+
+// --- begin factory ---
 
 type Factory[O flagutils.Options, S any, P kubecrtutils.ObjectPointer[T], T any] interface {
 	CreateOptions() O
 	CreateSettings(ctx context.Context, o O, controller controller.TypedController[P, T]) (S, error)
 	CreateRequest(*reconciler.BaseRequest[P], *Reconciler[O, S, P, T]) reconciler.ReconcileRequest[P]
 }
+
+// --- end factory ---
 
 type FactoryWithOptions[F flagutils.Options, S any, P kubecrtutils.ObjectPointer[T], T any] interface {
 	flagutils.Options
@@ -51,7 +56,7 @@ type ReconcilerFactory[O flagutils.Options, S any, P kubecrtutils.ObjectPointer[
 // by the given meta factory. The settings can be created based on the final
 // controller instance providing access to all elements declared in the controller definition.
 // The Option type is prepared to be sharable among multiple controllers using a flagutils.NewOptionsRef.
-func New[O flagutils.Options, S any, P kubecrtutils.ObjectPointer[T], T any](o func() O, s SettingsFactory[O, S, P, T], req RequestFactory[O, S, P, T]) *ReconcilerFactory[O, S, P, T] {
+func New[O flagutils.Options, S any, P kubecrtutils.ObjectPointer[T], T any](o OptionFactory[O], s SettingsFactory[O, S, P, T], req RequestFactory[O, S, P, T]) *ReconcilerFactory[O, S, P, T] {
 	return &ReconcilerFactory[O, S, P, T]{req, s, flagutils.NewOptionsRef[O](o)}
 }
 

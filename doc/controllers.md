@@ -195,3 +195,82 @@ Above this low-level interface, there are three higer level abstractions:
 - using a request base reconciler using various factories (`support.New`)
 - using low-level request object based reconciler (`reconciler.New`)
 
+All those wrappers bundle the reconcilation environment for 
+a dedicated reconcilation request into a `reconciler.ReconcileRequest` object.
+It provides access to dynamic information like the effective cluster and the
+resource object (as modifiable version and as original version),
+but also for shared information like the controller, the reconciler,
+the options and explicitly arbitrarily maintained shared information provided by the various factory variants.
+
+The underlying reconciler maps controller-runtime reconcilation requests to such an object. If the resource uses a status field/resource, it automatically checks whether the status has been changed and initiates a status update.
+
+##### `reconciler.New`
+
+This is the basic abstraction. It creates a reconciler factory based on a `reconciler.DefaultRequestFactoryFunc` function, able to create a `reconciler.ReconcileRequest`.
+
+```go
+
+type ReconcileRequest[T client.Object] interface {
+	Request[T]
+	ReconcilationLogic
+}
+```
+
+This request must implement the reconcilation logic
+
+```go
+
+type ReconcilationLogic interface {
+	Reconcile() myreconcile.Problem
+	ReconcileDeleting() myreconcile.Problem
+	ReconcileDeleted() myreconcile.Problem
+}
+```
+
+and implement all theother request related method. This is supported
+by providing a `reconciler.BaseRequest`, which can be embedded into the final reconcilation request object to implement all those state and methods.
+
+There is a second more general flavor pair `reconciler.NewWithOptions`/`reconciler.DefaultRequestFactoryFuncWithOptions`, which allows to specify an `Options` type, which is added to
+the reconciler factory and forwarded to the `baseRequest`-
+
+##### `support.New`
+
+On top of this abstraction `support.New` uses three separate factory functions (`Optionfactory`, `SettingsFactory`, and `RequestFactory`),
+for options, the shared `Settings` and one for the request creation to
+provide an appropriate factory and reconciler.
+
+The provided factory has the interface 
+
+```go
+
+type Factory[O flagutils.Options, S any, P kubecrtutils.ObjectPointer[T], T any] interface {
+	CreateOptions() O
+	CreateSettings(ctx context.Context, o O, controller controller.TypedController[P, T]) (S, error)
+	CreateRequest(*reconciler.BaseRequest[P], *Reconciler[O, S, P, T]) reconciler.ReconcileRequest[P]
+}
+```
+
+and is implemented by a `DefaultFactory` using the factory functions.
+
+A second flavor `support.NewByFactory` directly take such an implementation
+
+##### `support.NewByLogic`
+
+This abstraction is based on the previous one and simplifies all the factory functions.
+
+It only requires to implement the pure logic and shared state by implementing the interface ``
+
+```go
+
+type ReconcilationLogic[O flagutils.Options, S any, P kubecrtutils.ObjectPointer[T], T any] interface {
+	CreateSettings(ctx context.Context, o O, controller controller.TypedController[P, T]) (S, error)
+	Reconcile(request *Request[O, S, P, T]) myreconcile.Problem
+	ReconcileDeleting(request *Request[O, S, P, T]) myreconcile.Problem
+	ReconcileDeleted(request *Request[O, S, P, T]) myreconcile.Problem
+}
+```
+
+Is uses a standard implementation for the request, which forwards
+the logic implementation to the singleton logic object.
+
+This flavor is finally used by ur [walkthrough example](../README.md#walkthrough)

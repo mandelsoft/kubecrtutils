@@ -41,7 +41,7 @@ func NewControllerManagerByOpts(ctx context.Context, opts flagutils.OptionSetPro
 		return nil, fmt.Errorf("no clusters found in options")
 	}
 	clusters := copts.GetClusters()
-	mappings := mapping.NewControllerMappings(clusters.GetMappings())
+	mappings := mapping.NewControllerMappings(cluster.CreateMappingsProvidedBy(clusters))
 
 	logger := kubecrtutils.LogContext.WithContext(logging.NewRealm(kubecrtutils.Realm.Name() + "/" + def.GetName())).Logger()
 	logger.Info("configure controller manager {{cm}}", "cm", def.GetName())

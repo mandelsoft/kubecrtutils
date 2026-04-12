@@ -58,6 +58,7 @@ More detailed information is described for the following topics
  - [Owner Handling]({{owners}})
 
 ## Walkthrough
+{{walkthrough}}
 
 To illustrate the usage and the descriptive power of the library we use a simple
 example: we want to create a set of controllers orchestrated into a

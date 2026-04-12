@@ -175,6 +175,4 @@ type Clusters interface {
 	IsDisabled(name string) bool
 
 	Map(mapping mapping.Mappings, names ClusterNames) (Clusters, error)
-
-	GetMappings() mapping.Mappings
 }
