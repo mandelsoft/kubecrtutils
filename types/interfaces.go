@@ -22,10 +22,20 @@ type ControllerAware[T any] = func(ctx context.Context, cntr Controller) (T, err
 type ClusterAware[T any] = func(clusterName string, cluster cluster.Cluster) T
 type ClustersAware[T any] = func(ctx context.Context, logger logging.Logger, clusters Clusters) (T, error)
 
-type ClusterMatcher func(clusterId string) (clusterName string, equal bool)
-
 type SchemeProvider interface {
 	GetScheme() *runtime.Scheme
+}
+
+func AsSchemeProvider(s *runtime.Scheme) SchemeProvider {
+	return _schemeprovider{s}
+}
+
+type _schemeprovider struct {
+	s *runtime.Scheme
+}
+
+func (p _schemeprovider) GetScheme() *runtime.Scheme {
+	return p.s
 }
 
 type ObjectModifier interface {

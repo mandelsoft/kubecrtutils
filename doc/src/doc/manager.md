@@ -26,6 +26,8 @@ The definition is used to orchestrate further nested elements intended to be man
 
 The following features can be configured for a controller manager definition:
 
+
+- `WithOwnerHandler(<provider>`: Set default [owner handling]({{owners}}).
 - `WithScheme(<scheme>)`:  The main scheme to use. It should contain all resource types required by any of the orchestrated elements.
 - `AddControllerRule(<constraints>...)`: activation constraints orchestrated components and controllers.
 

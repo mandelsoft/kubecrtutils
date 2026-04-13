@@ -28,6 +28,15 @@ type HandlerProvider interface {
 	GetOwnerHandler(scheme types.SchemeProvider) Handler
 }
 
+type _provider struct {
+}
+
+var DefaultProvider = &_provider{}
+
+func (p *_provider) GetOwnerHandler(scheme types.SchemeProvider) Handler {
+	return NewHandler(scheme)
+}
+
 func NewHandler(scheme types.SchemeProvider, annos ...AnnotationType) Handler {
 	return NewHandlerWithScheme(scheme.GetScheme(), annos...)
 }

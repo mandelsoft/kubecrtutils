@@ -12,14 +12,25 @@ import (
 )
 
 const DEFAULT_SEPARATOR = string(apimtypes.Separator)
+
+// --- begin default annotation ---
+
 const DEFAULT_ANNOTATION_NAME = "cross-cluster.io/owner-id"
 
+// --- end default annotation ---
+
+// --- begin annotation type ---
+
+// AnnotationType handles anootations used to handle the persistence
+// of object relations in annotations.
 type AnnotationType interface {
 	Get(map[string]string) (Annotation, error)
 
 	CrossNamespaceAnnotation(group, kind, namespace, name string) Annotation
 	CrossClusterAnnotation(clusterid, group, kind, namespace, name string) Annotation
 }
+
+// --- end annotation type ---
 
 var StandardAnnotationType = DefaultAnnotationType()
 

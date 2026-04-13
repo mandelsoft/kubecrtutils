@@ -9,6 +9,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/component"
 	. "github.com/mandelsoft/kubecrtutils/log"
 	"github.com/mandelsoft/kubecrtutils/mapping"
+	"github.com/mandelsoft/kubecrtutils/owner"
 	"sigs.k8s.io/multicluster-runtime/pkg/manager"
 
 	"github.com/mandelsoft/flagutils"
@@ -165,6 +166,10 @@ type _controllermanager struct {
 
 func (cm *_controllermanager) GetLogger() logging.Logger {
 	return cm.logger
+}
+
+func (cm *_controllermanager) GetOwnerHandler(scheme cluster.SchemeProvider) owner.Handler {
+	return cm.definition.GetOwnerHandlerProvider().GetOwnerHandler(scheme)
 }
 
 func (cm *_controllermanager) GetControllerDefinition(name string) controller.Definition {

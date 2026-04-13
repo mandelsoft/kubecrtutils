@@ -19,7 +19,6 @@ import (
 	"github.com/mandelsoft/kubecrtutils/internal"
 	"github.com/mandelsoft/kubecrtutils/mapping"
 	"github.com/mandelsoft/kubecrtutils/objutils"
-	"github.com/mandelsoft/kubecrtutils/owner"
 	"github.com/mandelsoft/kubecrtutils/types"
 	"github.com/spf13/pflag"
 	"k8s.io/client-go/tools/record"
@@ -410,7 +409,7 @@ func (d *_definition[P, T]) Apply(ctx context.Context, m mapping.ControllerMappi
 		recorder:          f,
 		localIndices:      local,
 		indices:           call,
-		ohandler:          owner.NewHandler(c),
+		ohandler:          mgr.GetOwnerHandler(c),
 		finalizer:         finalizer,
 	}
 	err = mgr.GetControllers().Add(controller)

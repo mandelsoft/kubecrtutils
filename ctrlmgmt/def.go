@@ -11,6 +11,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/controller/constraints"
 	"github.com/mandelsoft/kubecrtutils/internal"
 	"github.com/mandelsoft/kubecrtutils/options/manageropts"
+	"github.com/mandelsoft/kubecrtutils/owner"
 	"github.com/spf13/pflag"
 	"golang.org/x/net/context"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -26,6 +27,10 @@ type Definition interface {
 	flagutils.OptionSetProvider
 
 	GetController(name string) controller.Definition
+	GetComponent(name string) component.Definition
+	GetIndex(name string) cacheindex.Definition
+
+	GetOwnerHandlerProvider() owner.HandlerProvider
 
 	GetError() error
 	GetControllerManager(ctx context.Context, opts flagutils.OptionSetProvider) (ControllerManager, error)
@@ -36,6 +41,7 @@ type Definition interface {
 type CompositionInterface interface {
 	Definition
 
+	WithOwnerHandler(provider owner.HandlerProvider) CompositionInterface
 	WithScheme(scheme *runtime.Scheme) CompositionInterface
 	AddCluster(def ...cluster.Definition) CompositionInterface
 	AddComponent(def ...component.Definition) CompositionInterface
@@ -53,6 +59,7 @@ type definition struct {
 	indices     cacheindex.Definitions
 	components  component.Definitions
 	controllers controller.Definitions
+	owner       owner.HandlerProvider
 }
 
 var _ CompositionInterface = (*definition)(nil)
@@ -64,6 +71,7 @@ func Define(name, main string) CompositionInterface {
 		indices:     cacheindex.NewDefinitions(),
 		components:  component.NewDefinitions(),
 		controllers: controller.NewDefinitions(),
+		owner:       owner.DefaultProvider,
 	}
 	d.options.Add(d.clusters, d.indices, d.controllers, d.components, manageropts.New(main, name))
 	return d
@@ -71,6 +79,11 @@ func Define(name, main string) CompositionInterface {
 
 func (d *definition) WithScheme(scheme *runtime.Scheme) CompositionInterface {
 	d.clusters.WithScheme(scheme)
+	return d
+}
+
+func (d *definition) WithOwnerHandler(h owner.HandlerProvider) CompositionInterface {
+	d.owner = h
 	return d
 }
 
@@ -111,6 +124,18 @@ func (d *definition) AsOptionSet() flagutils.OptionSet {
 
 func (d *definition) GetController(name string) controller.Definition {
 	return d.controllers.Get(name)
+}
+
+func (d *definition) GetComponent(name string) component.Definition {
+	return d.components.Get(name)
+}
+
+func (d *definition) GetIndex(name string) cacheindex.Definition {
+	return d.indices.Get(name)
+}
+
+func (d *definition) GetOwnerHandlerProvider() owner.HandlerProvider {
+	return d.owner
 }
 
 func (d *definition) GetError() error {

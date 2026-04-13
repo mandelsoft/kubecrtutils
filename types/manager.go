@@ -15,6 +15,7 @@ type ControllerManager interface {
 	GetIndex(name string) Index
 	GetComponents() Components
 	GetControllers() Controllers
+	GetOwnerHandler(scheme SchemeProvider) OwnerHandler
 
 	GetLogger() logging.Logger
 	GetControllerDefinition(name string) ControllerDefinition
