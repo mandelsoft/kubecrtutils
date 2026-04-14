@@ -8,6 +8,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/mapping"
 	"github.com/mandelsoft/kubecrtutils/types/plain"
 	"github.com/mandelsoft/logging"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -80,6 +81,7 @@ type Controller interface {
 	GetCluster() ClusterEquivalent
 	GetLogicalCluster(name string) ClusterEquivalent
 	GetResource() client.Object
+	GetGroupKind() schema.GroupKind
 	GetControllerManager() ControllerManager
 	GetRecoder(ctx context.Context) record.EventRecorder
 	GetReconciler() reconcile.Reconciler

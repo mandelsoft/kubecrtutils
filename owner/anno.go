@@ -36,6 +36,7 @@ var StandardAnnotationType = DefaultAnnotationType()
 
 type Annotation interface {
 	Put(map[string]string) map[string]string
+	Remove(m map[string]string) map[string]string
 
 	ForCluster(id string) Annotation
 
@@ -97,6 +98,14 @@ func (a _Annotation) Put(m map[string]string) map[string]string {
 		m = make(map[string]string)
 	}
 	m[a.name] = a.String()
+	return m
+}
+
+func (a _Annotation) Remove(m map[string]string) map[string]string {
+	if m == nil {
+		return m
+	}
+	delete(m, a.name)
 	return m
 }
 

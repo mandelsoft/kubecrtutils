@@ -83,7 +83,7 @@ func GetIndexFrom[T any](provider IndexProvider, name string) (TypedIndex[T], er
 	if i == nil {
 		return nil, fmt.Errorf("no index for %q found", name)
 	}
-	t, ok := i.(TypedIndex[T])
+	t, ok := i.GetEffective().(TypedIndex[T])
 	if !ok {
 		var e T
 		return nil, fmt.Errorf("type mismatch for %q: %T expected, but found %T", name, &e, i.GetResource())

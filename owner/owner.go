@@ -71,6 +71,28 @@ func (h *standard) SetOwner(cluster types.Cluster, owner client.Object, target t
 	return nil
 }
 
+func (h *standard) RemoveOwner(cluster types.Cluster, owner client.Object, target types.Cluster, slave client.Object) error {
+	sameCluster := cluster.IsSameAs(target)
+	// check for local ref
+	if sameCluster && owner.GetNamespace() == slave.GetNamespace() {
+		return controllerutil.RemoveOwnerReference(owner, slave, h.scheme)
+	}
+	gvk, err := apiutil.GVKForObject(owner, h.scheme)
+
+	if err != nil {
+		return err
+	}
+	if gvk.Group == "" {
+		gvk.Group = "core"
+	}
+	o := h.annoType.CrossNamespaceAnnotation(gvk.Group, gvk.Kind, owner.GetNamespace(), owner.GetName())
+	if cluster != nil && !cluster.IsSameAs(target) {
+		o = o.ForCluster(cluster.GetId())
+	}
+	objutils.ModifyAnnotations(slave, o.Remove)
+	return nil
+}
+
 func (h *standard) GetOwner(cmatch ClusterMatcher, target types.Cluster, obj client.Object, kind schema.GroupKind) (string, *client.ObjectKey) {
 	eq := funcs.Second(cmatch(target.GetId()))
 	if eq {

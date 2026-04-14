@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"github.com/mandelsoft/kubecrtutils/cluster"
+	"github.com/mandelsoft/kubecrtutils/controller/replication"
 )
 
 // --- begin settings ---
@@ -10,7 +11,7 @@ type Settings struct {
 	Target cluster.Cluster
 
 	// common state
-	Mapping Mapping
+	Mapping replication.ResourceMapping
 }
 
 // --- end settings ---

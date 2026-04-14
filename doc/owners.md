@@ -22,6 +22,8 @@ The interface (package `types`)
 
 type OwnerHandler interface {
 	SetOwner(cluster Cluster, owner client.Object, target Cluster, slave client.Object) error
+	RemoveOwner(cluster Cluster, owner client.Object, target Cluster, slave client.Object) error
+
 	// GetOwner extracts the owner of a dedicated type for obj in cluster target for
 	// clusters matched by cmatch.
 	GetOwner(cmatch ClusterMatcher, target Cluster, obj client.Object, kind schema.GroupKind) (string, *client.ObjectKey)

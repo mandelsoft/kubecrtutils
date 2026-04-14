@@ -96,6 +96,7 @@ type Controller interface {
 	GetCluster() ClusterEquivalent
 	GetLogicalCluster(name string) ClusterEquivalent
 	GetResource() client.Object
+	GetGroupKind() schema.GroupKind
 	GetControllerManager() ControllerManager
 	GetRecoder(ctx context.Context) record.EventRecorder
 	GetReconciler() reconcile.Reconciler

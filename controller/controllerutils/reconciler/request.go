@@ -20,6 +20,8 @@ import (
 	"github.com/spf13/pflag"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	builder2 "sigs.k8s.io/controller-runtime/pkg/builder"
@@ -88,6 +90,7 @@ type BaseRequest[T client.Object] struct {
 	record.EventRecorder
 	context.Context
 	logging.Logger
+	types.OwnerHandler
 	controller types.Controller
 	// --- begin request fields ---
 	mcreconcile.Request
@@ -161,6 +164,31 @@ func (r *BaseRequest[T]) UpdateStatus() myreconcile.Problem {
 }
 
 func (r *BaseRequest[T]) TriggerStatusChanged() {
+}
+
+// SetStatusCondition assumes there is a field Status.Conditions of type []metav1.Condition.
+func (r *BaseRequest[T]) SetStatusCondition(obj T, condition metav1.Condition) bool {
+	v := reflect.ValueOf(obj)
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+	s := v.FieldByName("Status")
+
+	if !s.IsValid() {
+		return false
+	}
+	if s.Kind() == reflect.Ptr {
+		s = s.Elem()
+	}
+	c := s.FieldByName("Conditions")
+	if !c.IsValid() {
+		return false
+	}
+
+	if condition.ObservedGeneration == 0 {
+		condition.ObservedGeneration = obj.GetGeneration()
+	}
+	return meta.SetStatusCondition(c.Addr().Interface().(*[]metav1.Condition), condition)
 }
 
 // Get help Goland resolve this method from interface cluster.Cluster.
@@ -306,6 +334,7 @@ func (d *crtReconciler[T]) Reconcile(ctx context.Context, request reconcile.Requ
 		Context:       ctx,
 		Cluster:       cl,
 		EventRecorder: cl.GetEventRecorderFor(d.name),
+		OwnerHandler:  d.controller.GetOwnerHandler(),
 		Logger:        d.logger.WithName(request.String()).WithValues("object", request.NamespacedName, "cluster", cl.GetName(), "effcluster", cl.GetEffective().GetName()),
 		Request:       mcreconcile.Request{request, clusterName},
 		After:         d.after,

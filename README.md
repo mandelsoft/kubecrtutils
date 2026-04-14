@@ -129,7 +129,7 @@ type Settings struct {
 	Target cluster.Cluster
 
 	// common state
-	Mapping Mapping
+	Mapping replication.ResourceMapping
 }
 
 ```
@@ -449,7 +449,7 @@ With
 		Namespace: namespace,
 	}
 
-	mctx := controllers.WithCluster(r, s.Target)
+	mctx := replication.WithCluster(r, s.Target)
 	prob := s.Mapping.SetOriginal(mctx, key, r.Request)
 	if prob != nil {
 		return prob
@@ -483,7 +483,7 @@ With
 	objutils.SetAnnotation(newp, controllers.REPLICATED_ANNOTATION, r.Cluster.GetId())
 	controllerutil.RemoveFinalizer(newp, r.Reconciler.Finalizer)
 
-	err := r.Reconciler.SetOwner(r.Cluster, r.Object, s.Target, newp)
+	err := r.SetOwner(r.Cluster, r.Object, s.Target, newp)
 	if err != nil {
 		return reconcile.TemporaryProblem(err)
 	}
@@ -502,7 +502,7 @@ With
 	objutils.SetAnnotation(newp, controllers.REPLICATED_ANNOTATION, r.Cluster.GetId())
 	controllerutil.RemoveFinalizer(newp, r.Reconciler.Finalizer)
 
-	err := r.Reconciler.SetOwner(r.Cluster, r.Object, s.Target, newp)
+	err := r.SetOwner(r.Cluster, r.Object, s.Target, newp)
 	if err != nil {
 		return reconcile.TemporaryProblem(err)
 	}

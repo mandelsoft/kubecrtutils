@@ -106,6 +106,10 @@ func (c *_controller[P, T]) GetResource() client.Object {
 	return c.definition.GetResource()
 }
 
+func (c *_controller[P, T]) GetGroupKind() schema.GroupKind {
+	return c.gk
+}
+
 func (c *_controller[P, T]) GetDefinition() TypedDefinition[P, T] {
 	return c.definition
 }

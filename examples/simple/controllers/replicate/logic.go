@@ -7,6 +7,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/controller"
 	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconcile"
 	"github.com/mandelsoft/kubecrtutils/controller/controllerutils/reconciler/logic"
+	"github.com/mandelsoft/kubecrtutils/controller/replication"
 	"github.com/mandelsoft/kubecrtutils/examples/simple/controllers"
 	"github.com/mandelsoft/kubecrtutils/objutils"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -25,7 +26,7 @@ func (r *ReconcilationLogic) CreateSettings(ctx context.Context, o *controllers.
 	s := &controllers.Settings{
 		Source:  c.GetClusters().Get(controllers.SOURCE),
 		Target:  c.GetClusters().Get(controllers.TARGET).AsCluster(),
-		Mapping: controllers.NewMapping(),
+		Mapping: replication.NewMapping().ForResource(c.GetGroupKind()),
 	}
 
 	log := c.GetLogger()
@@ -76,7 +77,7 @@ func (l *ReconcilationLogic) Reconcile(r Request) reconcile.Problem {
 		Namespace: namespace,
 	}
 
-	mctx := controllers.WithCluster(r, s.Target)
+	mctx := replication.WithCluster(r, s.Target)
 	prob := s.Mapping.SetOriginal(mctx, key, r.Request)
 	if prob != nil {
 		return prob
@@ -91,21 +92,22 @@ func (l *ReconcilationLogic) Reconcile(r Request) reconcile.Problem {
 	objutils.SetAnnotation(newp, controllers.REPLICATED_ANNOTATION, r.Cluster.GetId())
 	controllerutil.RemoveFinalizer(newp, r.Reconciler.Finalizer)
 
-	err := r.Reconciler.SetOwner(r.Cluster, r.Object, s.Target, newp)
+	err := r.SetOwner(r.Cluster, r.Object, s.Target, newp)
 	if err != nil {
 		return reconcile.TemporaryProblem(err)
 	}
 	// --- end prepare ---
 
+	// update/create replical
 	var tgt Resource
 	tgtp := &tgt
-	err = s.Target.Get(r.Context, key, tgtp)
+	err = s.Target.Get(r, key, tgtp)
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			return reconcile.TemporaryProblem(err)
 		}
 		r.Info("create in target")
-		err = s.Target.Create(r.Context, newp, &client.CreateOptions{
+		err = s.Target.Create(r, newp, &client.CreateOptions{
 			FieldManager: r.Reconciler.FieldManager,
 		})
 	} else {
@@ -158,7 +160,7 @@ func (*ReconcilationLogic) ReconcileDeleting(r Request) reconcile.Problem {
 				return reconcile.TemporaryProblem(client.IgnoreNotFound(err))
 			}
 		}
-		mctx := controllers.WithCluster(r, s.Target)
+		mctx := replication.WithCluster(r, s.Target)
 		return s.Mapping.RemoveOriginal(mctx, key)
 	}
 	patch := client.MergeFrom(tgtp.DeepCopyObject().(client.Object))
