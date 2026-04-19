@@ -198,3 +198,21 @@ Both flavors use a standard implementation for the request, which does not be im
 the logic implementation to the shared logic object by passing the request as argument.
 
 This flavor is finally used by ur [walkthrough example]({{walkthrough}})
+
+
+## Configuration by Options
+
+{{controllerconfig}}
+
+An option in the used main option set may implement
+the controller configuration interface
+
+```go
+{{include}{../$(root)/controller/config.go}{config interface}}
+```
+
+When a controller is instantiated it scans for implementations of
+this interface and calls it on all found options to apply additional configurations.
+
+Available options provided by the library:
+- `workeropts`: provide (multi-)option `--worker=<name>=<cnt>`to configure worker count for controller or group.

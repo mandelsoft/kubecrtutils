@@ -6,6 +6,7 @@ import (
 	"slices"
 	"sort"
 
+	"github.com/mandelsoft/goutils/generics"
 	"github.com/mandelsoft/kubecrtutils/component"
 	. "github.com/mandelsoft/kubecrtutils/log"
 	"github.com/mandelsoft/kubecrtutils/mapping"
@@ -24,6 +25,7 @@ import (
 )
 
 func NewControllerManagerByOpts(ctx context.Context, opts flagutils.OptionSetProvider) (ControllerManager, error) {
+	ctx = generics.WithValue(ctx, opts)
 	def := From(opts)
 	if def == nil {
 		return nil, fmt.Errorf("no management definition found")

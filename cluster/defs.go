@@ -117,12 +117,12 @@ func (d *definitions) Validate(ctx context.Context, opts flagutils.OptionSet, v 
 					if fb == DEFAULT {
 						err := v.Validate(ctx, opts, d.main)
 						if err != nil {
-							return d.AddError(err, "cluster ", d.main)
+							return d.AddError(err, "cluster ", d.main.GetName())
 						}
 
 						acc, err := d.main.Create(d)
 						if err != nil {
-							return d.AddError(err, "cluster ", d.main)
+							return d.AddError(err, "cluster ", d.main.GetName())
 						}
 						if acc != nil {
 							d.clusters.Add(acc)

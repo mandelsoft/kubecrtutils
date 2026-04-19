@@ -182,9 +182,9 @@ func (c *_cluster) LiftTechnical(clusterName string) (string, Cluster) {
 	if c.name == Normalize(clusterName) {
 		return c.name, c
 	}
-	setup.Log.Error("problem in cluster name mappings: cluster {{cluster}} cannot be seen as {{effective}}", "effective", c.name, "cluster", clusterName)
+	setup.Log.Warn("problem in cluster name mappings: cluster {{cluster}} cannot be seen as {{effective}}", "effective", c.name, "cluster", clusterName)
 	// is called by MCRT for omitted clusters, also
-	// panic(fmt.Errorf("problem in cluster nanme mappings: cluster %s cannot be seen as %q", c.name, clusterName))
+	// panic(fmt.Errorf("problem in cluster name mappings: cluster %s cannot be seen as %q", c.name, clusterName))
 	return "", nil
 }
 

@@ -276,3 +276,30 @@ Both flavors use a standard implementation for the request, which does not be im
 the logic implementation to the shared logic object by passing the request as argument.
 
 This flavor is finally used by ur [walkthrough example](../README.md#walkthrough)
+
+
+## Configuration by Options
+
+
+An option in the used main option set may implement
+the controller configuration interface
+
+```go
+
+type ControllerOptions = controller.TypedOptions[mcreconcile.Request]
+
+// ConfigurationProvider is used to modify the controller options used to
+// create a new controller.
+// Such objects can be set at the Options object to preprocess the configuration
+// after the option parsing. Or this interface can be implemented by other
+// Options types to incorporate their settings into the configuration.
+type ConfigurationProvider interface {
+	ConfigureController(ctx context.Context, config *ControllerOptions, name string, opts flagutils.OptionSet) error
+}
+```
+
+When a controller is instantiated it scans for implementations of
+this interface and calls it on all found options to apply additional configurations.
+
+Available options provided by the library:
+- `workeropts`: provide (multi-)option `--worker=<name>=<cnt>`to configure worker count for controller or group.

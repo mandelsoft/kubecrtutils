@@ -11,6 +11,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/options/activationopts"
 	"github.com/mandelsoft/kubecrtutils/options/metricsopts"
 	"github.com/mandelsoft/kubecrtutils/options/mlogopts"
+	"github.com/mandelsoft/kubecrtutils/options/workeropts"
 	"github.com/mandelsoft/kubecrtutils/setup"
 	"github.com/spf13/pflag"
 
@@ -58,6 +59,7 @@ func main() {
 		metricsopts.New(),    // options to control the manager metrics service
 		mlogopts.New(true),   // options to control mandelsoft/logging
 		activationopts.New(), // enable controller selection
+		workeropts.New(),     // enable queue worker configuration
 		// other options
 	)
 	// --- end orchestrate general functionality ---

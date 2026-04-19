@@ -247,6 +247,7 @@ It consists of three very simple delarative-like parts:
    		metricsopts.New(),    // options to control the manager metrics service
    		mlogopts.New(true),   // options to control mandelsoft/logging
    		activationopts.New(), // enable controller selection
+   		workeropts.New(),     // enable queue worker configuration
    		// other options
    	)
    ```
@@ -304,6 +305,7 @@ Usage of replicator:
       --target-kubeconfig string            replication target
       --target-kubeconfig-context string    context used together with target-kubeconfig
       --target-kubeconfig-identity string   identity used together with target-kubeconfig
+      --workers stringToInt                 workers for controller (default [])
 ```
 
 <a id="logic"></a>

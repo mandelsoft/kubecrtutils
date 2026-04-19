@@ -5,7 +5,9 @@ import (
 	"fmt"
 
 	"github.com/mandelsoft/flagutils"
+	"github.com/mandelsoft/goutils/errors"
 	"github.com/mandelsoft/goutils/general"
+	"github.com/mandelsoft/goutils/generics"
 	"github.com/mandelsoft/kubecrtutils"
 	"github.com/mandelsoft/kubecrtutils/cacheindex"
 	"github.com/mandelsoft/kubecrtutils/cluster"
@@ -23,6 +25,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	sigcluster "sigs.k8s.io/controller-runtime/pkg/cluster"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -151,7 +154,17 @@ func (c *_controller[P, T]) Complete(ctx context.Context) error {
 	bldr := multiclusterruntime.NewControllerManagedBy(mgr.GetManager()).Named(d.GetName())
 
 	Info(logger, "  configure reconciling of ", GroupKind(c.gk), " at ", LogicalClusterInfo(c.GetCluster()))
-	bldr = bldr.For(d.GetResource(), mcbuilder.WithPredicates(d.GetWatchPredicates()...), mcbuilder.WithClusterFilter(c.GetCluster().Filter))
+
+	var set = generics.FromContext[flagutils.OptionSetProvider](ctx)
+	var opts controller.TypedOptions[mcreconcile.Request]
+	opts.Logger = logger.V(3)
+	for _, cfg := range flagutils.Filter[ConfigurationProvider](set) {
+		err := cfg.ConfigureController(ctx, &opts, c.GetName(), set.AsOptionSet())
+		if err != nil {
+			return errors.Wrapf(err, "configuration provider for controller %s", c.GetName())
+		}
+	}
+	bldr = bldr.For(d.GetResource(), mcbuilder.WithPredicates(d.GetWatchPredicates()...), mcbuilder.WithClusterFilter(c.GetCluster().Filter)).WithOptions(opts)
 
 	trigger, err := cl.TriggerSource(d.GetResource())
 	if err != nil {
@@ -190,13 +203,13 @@ func (c *_controller[P, T]) addTrigger(ctx context.Context, bldr *mcbuilder.Buil
 	cname := general.OptionalNonZeroDefaulted(c.definition.GetCluster(), tdef.GetCluster())
 	target := c.GetClusters().Get(cname)
 	if target == nil {
-		return fmt.Errorf("cannot determine target cluster for %q: %w", cname)
+		return fmt.Errorf("cannot determine target cluster %q for trigger %s", cname, tdef.GetDescription())
 	}
 	Info(c.logger, "  configure resource-based trigger for ", GroupKind(gk), "[", KeyValue("description", tdef.GetDescription()), "] on ", LogicalClusterInfo(target))
 
 	m, err := tdef.GetMapper()(ctx, c)
 	if err != nil {
-		return fmt.Errorf("trigger %q: %w", err)
+		return fmt.Errorf("trigger %q: %w", tdef.GetDescription(), err)
 	}
 	bldr.Watches(
 		tdef.GetResource(),
@@ -234,12 +247,17 @@ func (r *reconcileWrapper[P, T]) Reconcile(ctx context.Context, request mcreconc
 ////////////////////////////////////////////////////////////////////////////////
 
 func watchWrapper[P kubecrtutils.ObjectPointer[T], T any](target types.ClusterEquivalent, factory mchandler.EventHandlerFunc, def ResourceTriggerDefinition) mchandler.EventHandlerFunc {
-	return func(clusterName string, cluster sigcluster.Cluster) mchandler.EventHandler {
-		n, cl := target.LiftTechnical(clusterName)
-		if cl == nil {
-			// return handler to avoid crashed for omitted clusters
+	return func(clusterName string, scl sigcluster.Cluster) mchandler.EventHandler {
+		var n string
+		var cl cluster.Cluster
+		if !target.GetEffective().Match(clusterName) {
+			// MCRT calls for all clusters, regardless whether they are omitted for a watch or not.
+			n, cl = target.LiftTechnical(clusterName)
+			if cl == nil {
+				// return handler to avoid crashed for omitted clusters
+			}
 		}
-		return &wrapperHandler{cl, n, factory(clusterName, cluster)}
+		return &wrapperHandler{cl, n, factory(clusterName, scl)}
 	}
 }
 

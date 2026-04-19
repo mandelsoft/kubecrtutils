@@ -82,5 +82,8 @@ the manager configuration interface
 {{include}{../$(root)/options/manageropts/config.go}{config interface}}
 ```
 
-When the manager is intantiated it scans for implementations of
+When the manager is instantiated it scans for implementations of
 this interface and calls it on all found options to apply additional configurations.
+
+Avaiulable options provided by the library:
+- `metricsopts`: Options to enable the metrics server for the controller manager (uses `tlsopts`)
