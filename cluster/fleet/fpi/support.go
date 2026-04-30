@@ -59,6 +59,9 @@ func (s *Support) Filter(clusterName string, cluster cluster.Cluster) bool {
 
 func (s *Support) Match(clusterName string) bool {
 	b, _ := Split(clusterName)
+	/*
+		fmt.Printf("match fleet %q[%s] for %q\n", clusterName, b, s.GetName())
+	*/
 	return b == s.name
 }
 
@@ -89,7 +92,7 @@ func (s *Support) _getCluster(ctx context.Context) (types.Cluster, error) {
 	if c == nil {
 		return nil, ErrClusterNotFoundInContext
 	}
-	b, _ := Split(c.GetName())
+	b, _ := Split(c.GetEffective().GetName())
 	if b != s.name {
 		return nil, ErrClusterNotOwned
 	}

@@ -114,6 +114,81 @@ func (n none) IsComponentsNone() bool {
 
 ////////////////////////////////////////////////////////////////////////////////
 
+type ConfigurableControllerMappings interface {
+	ConfigurableMappings[ConfigurableControllerMappings]
+}
+
+type _mcmappings[S any] struct {
+	_cmappings
+	self S
+}
+
+func NewConfigurableControllerMappings() ConfigurableControllerMappings {
+	m := newConfigurableMappings[ConfigurableControllerMappings](nil)
+	m.self = m
+	return m
+}
+
+func newConfigurableMappings[S any](self S) *_mcmappings[S] {
+	return &_mcmappings[S]{
+		self: self,
+		_cmappings: _cmappings{
+			indices:    Mappings{},
+			clusters:   Mappings{},
+			components: Mappings{},
+		},
+	}
+}
+
+func (m *_mcmappings[S]) GetSelf() S {
+	return m.self
+}
+
+func (m *_mcmappings[S]) UseMappings(mappings ControllerMappings) S {
+	for s, t := range mappings.IndexMappings() {
+		m.indices[s] = t
+	}
+	for s, t := range mappings.ClusterMappings() {
+		m.clusters[s] = t
+	}
+	for s, t := range mappings.ComponentMappings() {
+		m.components[s] = t
+	}
+	return m.self
+}
+
+func (m *_mcmappings[S]) MapIndex(src, tgt string) S {
+	m.indices[src] = tgt
+	return m.self
+}
+
+func (m *_mcmappings[S]) MapComponent(src, tgt string) S {
+	m.components[src] = tgt
+	return m.self
+}
+
+// MapCluster maps a cluster name as used in the controller definition to
+// a global controller manager cluster, when composing a controller
+// set for a controller manager.
+func (m *_mcmappings[S]) MapCluster(src, tgt string) S {
+	m.clusters[src] = tgt
+	return m.self
+}
+
+func (m *_mcmappings[S]) ComponentMappings() Mappings {
+	return m.components
+}
+
+func (m *_mcmappings[S]) ClusterMappings() Mappings {
+	return m.clusters
+}
+
+func (m *_mcmappings[S]) IndexMappings() Mappings {
+	return m.indices
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 func NewControllerMappings(clusters Mappings) *_cmappings {
 	if clusters == nil {
 		clusters = Mappings{}

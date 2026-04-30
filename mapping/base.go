@@ -13,34 +13,46 @@ type Consumer interface {
 
 }
 
+type ConfigurableMappings[S any] interface {
+	ControllerMappings
+
+	UseMappings(mappings ControllerMappings) S
+
+	ClusterMappable[S]
+	IndexMappable[S]
+	ComponentMappable[S]
+}
+
 type BaseMappable[S Consumer] interface {
 	ControllerMappings
+
+	UseMappings(mappings ControllerMappings) S
 
 	GetRequiredClusters(mappings ControllerMappings) ClusterNames
 	GetRequiredComponents(mappings ControllerMappings) ComponentNames
 	ApplyTo(mappings ControllerMappings) ControllerMappings
 }
 
-type ClusterMappable[S Consumer] interface {
+type ClusterMappable[S any] interface {
 	MapCluster(src, tgt string) S
 }
-type IndexMappable[S Consumer] interface {
+type IndexMappable[S any] interface {
 	MapIndex(src, tgt string) S
 }
-type ComponentMappable[S Consumer] interface {
+type ComponentMappable[S any] interface {
 	MapComponent(src, tgt string) S
 }
 
 type Mappable[S Consumer] interface {
 	BaseMappable[S]
+
 	ClusterMappable[S]
 	IndexMappable[S]
 	ComponentMappable[S]
 }
 
 type BaseMappings[S Consumer] struct {
-	_cmappings
-	self S
+	_mcmappings[S]
 }
 
 var (
@@ -51,12 +63,24 @@ var (
 
 func NewBaseMappings[S Consumer](self S) *BaseMappings[S] {
 	return &BaseMappings[S]{
-		self:       self,
-		_cmappings: *NewControllerMappings(nil),
+		_mcmappings: *newConfigurableMappings(self),
 	}
 }
 
 func (d *BaseMappings[S]) GetSelf() S {
+	return d.self
+}
+
+func (d *BaseMappings[S]) UseMappings(mappings ControllerMappings) S {
+	for s, t := range mappings.IndexMappings() {
+		d.indices[s] = t
+	}
+	for s, t := range mappings.ClusterMappings() {
+		d.clusters[s] = t
+	}
+	for s, t := range mappings.ComponentMappings() {
+		d.components[s] = t
+	}
 	return d.self
 }
 

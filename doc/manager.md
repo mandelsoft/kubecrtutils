@@ -15,7 +15,7 @@ Like those elements the element orchestration is defined in a declarative way.  
 
 A controller manager is declared with the following function
 
-- `ctrlmgmt.Define(<name>, <cluster>)`: Definition of a controller controller manager for a given main [cluster](clusters.md#clusters) 
+- `ctrlmgmt.Define(<name>, <cluster>...)`: Definition of a controller manager. It is possible to specify an order of logical  [clusters](clusters.md#clusters), which should be used as main cluster for the controller runtime. This cluster is not used by this library, but required by the controller runtime. It is selected from the given list according to the actual clusterr settings. Only configured regular Kubernetes clusters are selected, or, if available, base clusters for fleets.
 
 The complete definition interface is as follows:
 

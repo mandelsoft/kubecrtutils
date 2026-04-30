@@ -19,10 +19,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
-func DefinitionFromContext(ctx context.Context) Definition {
-	return generics.Cast[Definition](ctx.Value("component"))
-}
-
 // --- begin factory ---
 
 type Factory interface {
@@ -186,7 +182,7 @@ func (d *_definition) Finalize(ctx context.Context, opts flagutils.OptionSet, v 
 func (d *_definition) CreateIndices(ctx context.Context, mappings mapping.ControllerMappings, mgr types.ControllerManager) error {
 	logger := mgr.GetLogger().WithName(d.GetName()).WithValues("component", d.GetName())
 
-	ctx = context.WithValue(ctx, "component", d)
+	ctx = addToContext(ctx, d)
 	ctx = context.WithValue(ctx, "options", d.GetOptions())
 	for n, i := range d.foreign.Elements {
 		logger.Info("- configuring foreign index {{index}} from component {{component}}", "index", n, "component", d.GetName())

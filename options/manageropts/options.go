@@ -5,12 +5,10 @@ import (
 	"fmt"
 
 	"github.com/mandelsoft/flagutils"
-	"github.com/mandelsoft/goutils/set"
 	"github.com/mandelsoft/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubecrtutils/options/metricsopts"
 	"github.com/mandelsoft/kubecrtutils/options/tlsopts"
 	"github.com/mandelsoft/kubecrtutils/options/webhookopts"
-	"github.com/mandelsoft/kubecrtutils/types"
 	"github.com/mandelsoft/logging"
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -25,7 +23,8 @@ import (
 
 type Options struct {
 	// main is the cluster used as main cluster for the manager
-	main                    string
+	// here, we offer some possibilities to select it from concrete settings
+	main                    []string
 	Nested                  flagutils.OptionSet
 	EnableLeaderElection    bool
 	LeaderElectionNamespace string
@@ -40,8 +39,6 @@ type Options struct {
 	Configurations []ConfigurationProvider
 }
 
-var _ cluster.ClusterFilter = (*Options)(nil)
-
 func From(opts flagutils.OptionSetProvider) *Options {
 	return flagutils.GetFrom[*Options](opts)
 }
@@ -51,10 +48,7 @@ var (
 	_ flagutils.Validatable = (*Options)(nil)
 )
 
-func New(main string, electionId string, configs ...ConfigurationProvider) *Options {
-	if main == "" {
-		main = cluster.DEFAULT
-	}
+func New(main []string, electionId string, configs ...ConfigurationProvider) *Options {
 	nested := flagutils.NewOptionSet(tlsopts.New())
 	return &Options{Nested: nested, defaultElectionId: electionId, Configurations: configs, main: main}
 }
@@ -80,9 +74,9 @@ func (o *Options) Validate(ctx context.Context, opts flagutils.OptionSet, v flag
 		return err
 	}
 
-	main := clusters.Get(o.main)
+	main := o.SelectMain(clusters)
 	if main == nil {
-		return fmt.Errorf("could not find main cluster %q", o.main)
+		return fmt.Errorf("could not find a main cluster")
 	}
 
 	_, err = flagutils.ValidatedOptions[*metricsopts.Options](ctx, opts, v)
@@ -106,12 +100,44 @@ func (o *Options) AsOptionSet() flagutils.OptionSet {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-func (o *Options) GetUsedClusters(types.ConstraintContext) types.ClusterNames {
-	return set.New[string](o.main)
+func (o *Options) GetMain() []string {
+	return o.main
 }
 
-func (o *Options) GetMain() string {
-	return o.main
+func (o *Options) SelectMain(clusters cluster.Clusters) cluster.Cluster {
+	if o.main == nil {
+		c := checkForCluster(clusters.Get(cluster.DEFAULT))
+		if c != nil {
+			return c
+		}
+		for _, e := range clusters.Elements {
+			c = checkForCluster(e)
+			if c != nil {
+				return c.GetEffective().AsCluster()
+			}
+		}
+	}
+	for _, n := range o.main {
+		c := checkForCluster(clusters.Get(n))
+		if c != nil {
+			return c.GetEffective().AsCluster()
+		}
+	}
+	return nil
+}
+
+func checkForCluster(c cluster.ClusterEquivalent) cluster.Cluster {
+	if c == nil {
+		return nil
+	}
+	if c.AsCluster() != nil {
+		return c.AsCluster()
+	}
+	f := c.AsFleet()
+	if f == nil {
+		return nil
+	}
+	return f.GetBaseCluster()
 }
 
 func (o *Options) GetManager(ctx context.Context, opts flagutils.OptionSetProvider) (ctrl.Manager, error) {
@@ -120,19 +146,9 @@ func (o *Options) GetManager(ctx context.Context, opts flagutils.OptionSetProvid
 		return nil, fmt.Errorf("no cluster definitions found in options")
 	}
 
-	cl := configuredClusters.Get(o.main)
-	if cl == nil {
-		return nil, fmt.Errorf("could not find main cluster %q", o.main)
-	}
-
-	var main cluster.Cluster
-	if cl.AsFleet() != nil {
-		if cl.AsFleet().GetBaseCluster() == nil {
-			return nil, fmt.Errorf("could not find base cluster for fleet %q to instantiate manager", o.main)
-		}
-		main = cl.AsFleet().GetBaseCluster()
-	} else {
-		main = cl.AsCluster()
+	main := o.SelectMain(configuredClusters)
+	if main == nil {
+		return nil, fmt.Errorf("could not find a main cluster")
 	}
 
 	metrics := metricsopts.From(opts)
@@ -160,6 +176,9 @@ func (o *Options) GetManager(ctx context.Context, opts flagutils.OptionSetProvid
 		// if you are doing or is intended to do any operation such as perform cleanups
 		// after the manager stops then its usage might be unsafe.
 		// LeaderElectionReleaseOnCancel: true,
+
+		/* don't share anything, just let the manager create its own access
+		 */
 
 		// implicit cluster creation cannot be circumvented (why), so fake
 		// using shared info as far as possible.,
@@ -208,11 +227,11 @@ func (o *Options) GetManager(ctx context.Context, opts flagutils.OptionSetProvid
 	found := sets.New[string]()
 	for _, c := range configuredClusters.Elements {
 		eff := c.GetEffective()
-		if !found.Has(c.GetName()) {
-			found.Insert(c.GetName())
+		if !found.Has(eff.GetName()) {
+			found.Insert(eff.GetName())
 			if eff.AsFleet() != nil {
 				cfg.Logger.Info("adding fleet {{fleet}} -> {{effective}}", "fleet", c.GetName(), "effective", c.GetEffective().GetName())
-				err = provider.AddProvider(c.GetName(), c.AsFleet().GetProvider())
+				err = provider.AddProvider(eff.GetName(), eff.AsFleet().GetProvider())
 			} else {
 				cfg.Logger.Info("adding cluster {{cluster}} -> {{effective}}", "cluster", c.GetName(), "effective", c.GetEffective().GetName())
 				err = clusterprovider.Add(ctx, eff.GetName(), eff.AsCluster())

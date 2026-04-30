@@ -72,7 +72,7 @@ func (c *_fleetAlias) GetCluster(name string) types.Cluster {
 
 func (a *_fleetAlias) LiftTechnical(name string) (string, types.Cluster) {
 	b, n := fpi.Split(name)
-	if a.GetName() == b {
+	if a.Fleet.GetName() == b {
 		return a.Compose(n), a.GetClusterByLocalName(n)
 	}
 	panic(fmt.Errorf("technical cluster %q does not match logical fleet %q[%s]", name, a.GetName(), a.GetEffective().GetName()))

@@ -64,7 +64,7 @@ type definition struct {
 
 var _ CompositionInterface = (*definition)(nil)
 
-func Define(name, main string) CompositionInterface {
+func Define(name string, main ...string) CompositionInterface {
 	d := &definition{
 		Element:     internal.NewElement(name),
 		clusters:    cluster.NewDefinitions(),

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 	"sort"
+	"sync"
 
 	"github.com/mandelsoft/goutils/generics"
 	"github.com/mandelsoft/kubecrtutils/component"
@@ -63,13 +64,7 @@ func NewControllerManagerByOpts(ctx context.Context, opts flagutils.OptionSetPro
 		list = slices.Insert(list, 0, cluster.DEFAULT)
 	}
 
-	main := clusters.Get(mopts.GetMain())
-	if main.AsFleet() != nil {
-		main = main.AsFleet().GetBaseCluster()
-		if main == nil {
-			return nil, fmt.Errorf("no fleet base cluster usable as main cluster for controller manager")
-		}
-	}
+	main := mopts.SelectMain(clusters)
 
 	for _, n := range list {
 		c := clusters.Get(n)
@@ -79,6 +74,8 @@ func NewControllerManagerByOpts(ctx context.Context, opts flagutils.OptionSetPro
 			Info(logger, "  using logical ", LogicalClusterInfo(c))
 		}
 	}
+
+	Info(logger, "using main ", ClusterInfo(main, "main"))
 
 	mcmgr, err := mopts.GetManager(ctx, opts)
 	if err != nil {
@@ -100,6 +97,8 @@ func NewControllerManagerByOpts(ctx context.Context, opts flagutils.OptionSetPro
 		components: component.NewComponents(),
 		definition: def,
 	}
+
+	ctx = addToContext(ctx, cm)
 
 	iopts := cacheindex.From(opts)
 	if iopts != nil && iopts.Len() > 0 {
@@ -154,6 +153,10 @@ func NewControllerManagerByOpts(ctx context.Context, opts flagutils.OptionSetPro
 	return cm, nil
 }
 
+func GetData[K comparable, T any](mgr ControllerManager, k K, c func() T) T {
+	return mgr.GetData(k, func() any { return c() }).(T)
+}
+
 type _controllermanager struct {
 	internal.Element
 	logger      logging.Logger
@@ -164,6 +167,20 @@ type _controllermanager struct {
 	controllers controller.Controllers
 	components  component.Components
 	definition  Definition
+
+	lock sync.Mutex
+	data map[any]any
+}
+
+func (cm *_controllermanager) GetData(k any, c func() any) any {
+	cm.lock.Lock()
+	defer cm.lock.Unlock()
+	old := cm.data[k]
+	if old == nil {
+		old = c()
+		cm.data[k] = old
+	}
+	return old
 }
 
 func (cm *_controllermanager) GetLogger() logging.Logger {

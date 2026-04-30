@@ -19,4 +19,6 @@ type ControllerManager interface {
 
 	GetLogger() logging.Logger
 	GetControllerDefinition(name string) ControllerDefinition
+
+	GetData(k any, c func() any) any
 }

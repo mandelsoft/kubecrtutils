@@ -18,7 +18,7 @@ var Log logging.Logger
 // at different times it is not possible just to shift
 // the level, we have to manipulate the commonly used sink, instead.
 func init() {
-	base := logrusl.Human(true).NewLogr()
+	base := logrusl.Human().NewLogr()
 
 	logging.DefaultContext().SetBaseLogger(base)
 

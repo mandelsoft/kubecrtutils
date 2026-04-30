@@ -47,6 +47,17 @@ func (d *definitions) GetScheme() *runtime.Scheme {
 	return d.scheme
 }
 
+func (d *definitions) Add(defs ...Definition) Definitions {
+	for _, def := range defs {
+		if def.GetName() == DEFAULT {
+			d.main = def
+		} else {
+			d.DefinitionsImpl.Add(def)
+		}
+	}
+	return d
+}
+
 func (d *definitions) AddFlags(fs *pflag.FlagSet) {
 	if d.Len() > 1 {
 		// If we work with multiple clusters we enforce the usage og identity options
@@ -105,7 +116,9 @@ func (d *definitions) Validate(ctx context.Context, opts flagutils.OptionSet, v 
 				eff := d.clusters.Get(fb)
 				if eff != nil {
 					if !def.AcceptFleet() && eff.AsFleet() != nil && required.Contains(def.GetName()) {
-						return fmt.Errorf("fallback %q for cluster %q is fleet", fb, def.GetName())
+						if required.Contains(def.GetName()) {
+							return fmt.Errorf("fallback %q for cluster %q is fleet, but no fleet accepted for this logical cluster", fb, def.GetName())
+						}
 					}
 					d.clusters.Add(NewAlias(n, eff))
 					found = true

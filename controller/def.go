@@ -313,7 +313,7 @@ func (d *_definition[P, T]) GetForeignIndices() cacheindex.Definitions {
 func (d *_definition[P, T]) CreateIndices(ctx context.Context, mappings mapping.ControllerMappings, mgr types.ControllerManager) error {
 	logger := mgr.GetLogger().WithName(d.GetName()).WithValues("controller", d.GetName())
 
-	ctx = context.WithValue(ctx, "controller", d)
+	ctx = addToContext(ctx, d)
 	ctx = context.WithValue(ctx, "options", d.GetOptions())
 
 	for n, i := range d.indices.Elements {

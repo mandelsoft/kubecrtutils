@@ -164,6 +164,7 @@ func (c *_cluster) Filter(clusterName string, _ cluster.Cluster) bool {
 }
 
 func (c *_cluster) Match(clusterName string) bool {
+	// fmt.Printf("match %q for %q\n", clusterName, c.GetName())
 	return c.GetName() == Normalize(clusterName)
 }
 
