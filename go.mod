@@ -9,7 +9,7 @@ require (
 	github.com/kcp-dev/logicalcluster/v3 v3.0.5
 	github.com/kcp-dev/multicluster-provider v0.5.0
 	github.com/kcp-dev/sdk v0.30.0
-	github.com/mandelsoft/flagutils v0.0.0-20260411162530-8fa8704c866e
+	github.com/mandelsoft/flagutils v0.0.0-20260501194609-8a50fcdc8aa7
 	github.com/mandelsoft/goutils v0.0.0-20260419151859-e28bee9b7032
 	github.com/mandelsoft/kubedns v0.0.0-00010101000000-000000000000
 	github.com/mandelsoft/logging v0.0.0-20260220094735-62d1006ceeb4

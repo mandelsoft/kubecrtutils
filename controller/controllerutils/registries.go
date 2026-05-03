@@ -4,10 +4,19 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 
+	"github.com/mandelsoft/flagutils"
+	"github.com/spf13/pflag"
 	"golang.org/x/exp/maps"
 )
+
+type None struct{}
+
+type DefaultElement interface {
+	IsDefault() bool
+}
 
 // Factory acts a factory for a target object using a configuration.
 type Factory[C any, O any] interface {
@@ -28,21 +37,57 @@ func (f FactoryFunc[C, O]) Description() string {
 // Registry registers a set of named factory alternative for a particular purpose.
 // It can then be used to create an appropriate instace for a given type name and configuration.
 type Registry[C any, O any] interface {
+	flagutils.OptionSet
+
+	Clone() Registry[C, O]
+	SelectedMode() string
+
 	Register(name string, factory Factory[C, O])
 	Names() []string
+	Description() string
 
 	Get(name string) Factory[C, O]
 	Create(ctx context.Context, name string, cfg C) (O, error)
+
+	CreateConfigured(ctx context.Context, opts C) (O, error)
 }
 
 type registry[C, O any] struct {
 	lock      sync.RWMutex
 	typ       string
+	desc      string
+	def       string
 	factories map[string]Factory[C, O]
+	mode      string
+
+	flagutils.DefaultOptionSet
 }
 
-func NewRegistry[C any, O any](typ string) Registry[C, O] {
-	return &registry[C, O]{typ: typ, factories: make(map[string]Factory[C, O])}
+func NewRegistry[C any, O any](typ, desc string) Registry[C, O] {
+	return &registry[C, O]{typ: typ, factories: make(map[string]Factory[C, O]), desc: desc}
+}
+
+func (r *registry[C, O]) AddFlags(fs *pflag.FlagSet) {
+	fs.StringVarP(&r.typ, r.typ, "", r.mode, r.desc+"("+strings.Join(r.Names(), ", ")+")")
+	r.DefaultOptionSet.AddFlags(fs)
+}
+
+func (r *registry[C, O]) SelectedMode() string {
+	return r.mode
+}
+
+func (r *registry[C, O]) Clone() Registry[C, O] {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	n := NewRegistry[C, O](r.typ, r.desc)
+	for k, v := range r.factories {
+		n.Register(k, v)
+	}
+	return n
+}
+
+func (r *registry[C, O]) Description() string {
+	return r.desc
 }
 
 func (r *registry[C, O]) Register(name string, f Factory[C, O]) {
@@ -50,6 +95,14 @@ func (r *registry[C, O]) Register(name string, f Factory[C, O]) {
 	defer r.lock.Unlock()
 
 	r.factories[name] = f
+	if o, ok := f.(flagutils.Options); ok {
+		r.DefaultOptionSet.Add(o)
+	}
+	if d, ok := f.(DefaultElement); ok {
+		if d.IsDefault() {
+			r.def = name
+		}
+	}
 }
 
 func (r *registry[C, O]) Names() []string {
@@ -64,6 +117,14 @@ func (r *registry[C, O]) Get(name string) Factory[C, O] {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 	return r.factories[name]
+}
+
+func (r *registry[C, O]) CreateConfigured(ctx context.Context, opts C) (O, error) {
+	var _nil O
+	if r.def == "" {
+		return _nil, fmt.Errorf("no %s configured", r.typ)
+	}
+	return r.CreateConfigured(ctx, opts)
 }
 
 func (r *registry[C, O]) Create(ctx context.Context, name string, cfg C) (O, error) {
