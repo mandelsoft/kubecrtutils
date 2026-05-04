@@ -58,7 +58,7 @@ type registry[C, O any] struct {
 	desc      string
 	def       string
 	factories map[string]Factory[C, O]
-	mode      string
+	selected  string
 
 	flagutils.DefaultOptionSet
 }
@@ -68,12 +68,12 @@ func NewRegistry[C any, O any](typ, desc string) Registry[C, O] {
 }
 
 func (r *registry[C, O]) AddFlags(fs *pflag.FlagSet) {
-	fs.StringVarP(&r.typ, r.typ, "", r.mode, r.desc+"("+strings.Join(r.Names(), ", ")+")")
+	fs.StringVarP(&r.selected, r.typ, "", r.def, r.desc+"("+strings.Join(r.Names(), ", ")+")")
 	r.DefaultOptionSet.AddFlags(fs)
 }
 
 func (r *registry[C, O]) SelectedMode() string {
-	return r.mode
+	return r.selected
 }
 
 func (r *registry[C, O]) Clone() Registry[C, O] {
@@ -101,6 +101,7 @@ func (r *registry[C, O]) Register(name string, f Factory[C, O]) {
 	if d, ok := f.(DefaultElement); ok {
 		if d.IsDefault() {
 			r.def = name
+			r.selected = name
 		}
 	}
 }
@@ -121,10 +122,10 @@ func (r *registry[C, O]) Get(name string) Factory[C, O] {
 
 func (r *registry[C, O]) CreateConfigured(ctx context.Context, opts C) (O, error) {
 	var _nil O
-	if r.def == "" {
+	if r.selected == "" {
 		return _nil, fmt.Errorf("no %s configured", r.typ)
 	}
-	return r.CreateConfigured(ctx, opts)
+	return r.Create(ctx, r.selected, opts)
 }
 
 func (r *registry[C, O]) Create(ctx context.Context, name string, cfg C) (O, error) {

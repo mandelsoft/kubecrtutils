@@ -1,6 +1,8 @@
 package cluster
 
 import (
+	"fmt"
+
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/kubecrtutils/cluster/config"
 	"github.com/mandelsoft/kubecrtutils/types"
@@ -29,7 +31,11 @@ type baseDef[D Definition] struct {
 
 func newBase[D Definition](self D, name string, desc string, rule ...config.Rule) baseDef[D] {
 	if len(rule) == 0 {
-		rule = []config.Rule{config.DedicatedConfigRules(name, desc)}
+		if name == DEFAULT {
+			rule = []config.Rule{config.DedicatedConfigRules("", desc)}
+		} else {
+			rule = []config.Rule{config.DedicatedConfigRules(name, desc)}
+		}
 	}
 	return baseDef[D]{self: self, baseAttr: baseAttr{name: name, desc: desc, fallback: DEFAULT, rules: config.NewRules(rule...)}}
 }
@@ -76,6 +82,9 @@ func (d *baseDef[D]) GetConfig(o *config.ConfigOptions) (*config.Config, error) 
 
 func (d *baseDef[D]) AddFlags(fs *pflag.FlagSet) {
 	d.rules.AddFlags(fs)
+	if d.name != DEFAULT {
+		fs.StringVarP(&d.fallback, fmt.Sprintf("%s-redirect", d.name), "", d.fallback, "fallback definition")
+	}
 }
 
 func (d *baseDef[D]) AsOptionSet() flagutils.OptionSet {

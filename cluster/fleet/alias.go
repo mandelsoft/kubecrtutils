@@ -53,7 +53,7 @@ func (c *_fleetAlias) GetClusterByLocalName(name string) types.Cluster {
 	if n != nil {
 		f = c.clusters[name]
 		if f == nil || f.GetEffective() != n {
-			f = cluster.NewAlias(name, n)
+			f = cluster.NewAlias(c.Compose(name), n)
 			c.clusters[name] = f
 		}
 	} else {

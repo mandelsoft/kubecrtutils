@@ -84,7 +84,7 @@ func (s *Support) createRequest(ctx context.Context, key client.ObjectKey) (mcre
 	if err != nil {
 		return mcreconcile.Request{}, err
 	}
-	return mcreconcile.Request{ClusterName: c.GetName(), Request: reconcile.Request{key}}, nil
+	return mcreconcile.Request{ClusterName: c.GetEffective().GetName(), Request: reconcile.Request{key}}, nil
 }
 
 func (s *Support) _getCluster(ctx context.Context) (types.Cluster, error) {

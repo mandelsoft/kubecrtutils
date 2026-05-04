@@ -60,7 +60,7 @@ func (d *definitions) Add(defs ...Definition) Definitions {
 
 func (d *definitions) AddFlags(fs *pflag.FlagSet) {
 	if d.Len() > 1 {
-		// If we work with multiple clusters we enforce the usage og identity options
+		// If we work with multiple clusters we enforce the usage of identity options
 		d.main.RequireIdentity()
 		for _, c := range d.Elements {
 			c.RequireIdentity()
