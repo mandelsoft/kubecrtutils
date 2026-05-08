@@ -16,6 +16,7 @@ func (m *ObjectMerger) MergeObservingManagedFields(liveObj, desiredObj client.Ob
 	if err != nil {
 		return nil, err
 	}
+
 	// converter := managedfields.NewDeducedTypeConverter()
 	converter, err := m.converters.GetConverter(gvk)
 	if err != nil {

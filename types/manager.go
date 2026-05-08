@@ -21,4 +21,6 @@ type ControllerManager interface {
 	GetControllerDefinition(name string) ControllerDefinition
 
 	GetData(k any, c func() any) any
+
+	Cancel()
 }

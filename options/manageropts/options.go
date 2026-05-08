@@ -6,9 +6,8 @@ import (
 
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/kubecrtutils/cluster"
-	"github.com/mandelsoft/kubecrtutils/options/metricsopts"
+	"github.com/mandelsoft/kubecrtutils/ctxutils"
 	"github.com/mandelsoft/kubecrtutils/options/tlsopts"
-	"github.com/mandelsoft/kubecrtutils/options/webhookopts"
 	"github.com/mandelsoft/logging"
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -79,16 +78,6 @@ func (o *Options) Validate(ctx context.Context, opts flagutils.OptionSet, v flag
 		return fmt.Errorf("could not find a main cluster")
 	}
 
-	_, err = flagutils.ValidatedOptions[*metricsopts.Options](ctx, opts, v)
-	if err != nil {
-		return err
-	}
-
-	_, err = flagutils.ValidatedOptions[*webhookopts.Options](ctx, opts, v)
-	if err != nil {
-		return err
-	}
-
 	_, err = flagutils.ValidatedFilteredOptions[ConfigurationProvider](ctx, opts, v)
 	return err
 }
@@ -151,16 +140,11 @@ func (o *Options) GetManager(ctx context.Context, opts flagutils.OptionSetProvid
 		return nil, fmt.Errorf("could not find a main cluster")
 	}
 
-	metrics := metricsopts.From(opts)
-	web := webhookopts.From(opts)
-
 	configs := flagutils.Filter[ConfigurationProvider](opts)
 
 	cfg := ctrl.Options{
-		Logger:                  logging.DefaultContext().Logger(logging.NewRealm("controller-manager")).V(4),
+		Logger:                  logging.DefaultContext().Logger(logging.NewRealm("controller-manager")).V(logging.InfoLevel),
 		Scheme:                  main.GetScheme(),
-		Metrics:                 metrics.GetMetricsServerOpts(),
-		WebhookServer:           web.GetServer(),
 		HealthProbeBindAddress:  o.ProbeAddr,
 		LeaderElection:          o.EnableLeaderElection,
 		LeaderElectionNamespace: o.LeaderElectionNamespace,
@@ -214,9 +198,12 @@ func (o *Options) GetManager(ctx context.Context, opts flagutils.OptionSetProvid
 		return nil, err
 	}
 
+	m = &startWrapper{m}
+
 	clusterprovider := clusters.New()
 	provider.AddProvider("", clusterprovider)
 
+	ready := NewReady(m)
 	if err := m.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		return nil, fmt.Errorf("unable to set up health check: %w", err)
 	}
@@ -230,18 +217,33 @@ func (o *Options) GetManager(ctx context.Context, opts flagutils.OptionSetProvid
 		if !found.Has(eff.GetName()) {
 			found.Insert(eff.GetName())
 			if eff.AsFleet() != nil {
-				cfg.Logger.Info("adding fleet {{fleet}} -> {{effective}}", "fleet", c.GetName(), "effective", c.GetEffective().GetName())
+				cfg.Logger.Info("adding fleet {{fleet}} -> {{effective}}", "fleet", c.GetName(), "effective", eff.GetName())
 				err = provider.AddProvider(eff.GetName(), eff.AsFleet().GetProvider())
+				ready.Add("fleet "+eff.GetName(), eff.AsFleet())
 			} else {
-				cfg.Logger.Info("adding cluster {{cluster}} -> {{effective}}", "cluster", c.GetName(), "effective", c.GetEffective().GetName())
+				cfg.Logger.Info("adding cluster {{cluster}} -> {{effective}}", "cluster", c.GetName(), "effective", eff.GetName())
 				err = clusterprovider.Add(ctx, eff.GetName(), eff.AsCluster())
+				ready.Add("cluster "+eff.GetName(), eff.AsCluster())
 			}
 		} else {
-			cfg.Logger.Info("cluster {{cluster}} -> {{effective}} already added", "cluster", c.GetName(), "effective", c.GetEffective().GetName())
+			cfg.Logger.Info("cluster {{cluster}} -> {{effective}} already added", "cluster", c.GetName(), "effective", eff.GetName())
 		}
 		if err != nil {
 			return nil, err
 		}
 	}
+
+	if err := m.AddReadyzCheck("cachesync", ready.Check); err != nil {
+		return nil, fmt.Errorf("unable to set up cachesync check: %w", err)
+	}
 	return m, nil
+}
+
+type startWrapper struct {
+	ctrl.Manager
+}
+
+func (s *startWrapper) Start(ctx context.Context) error {
+	s.GetLogger().Info("starting manager with cancel option")
+	return s.Manager.Start(ctxutils.WithCancel(s, ctx))
 }

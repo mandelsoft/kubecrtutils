@@ -50,6 +50,8 @@ type ControllerDefinition interface {
 
 	IndexProvider
 	Applyable
+
+	HealthDefinition[Controller]
 }
 
 type ControllerDefinitions interface {

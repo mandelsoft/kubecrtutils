@@ -16,6 +16,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/cluster/clustercontext"
 	"github.com/mandelsoft/kubecrtutils/controller/builder"
 	"github.com/mandelsoft/kubecrtutils/controller/constraints"
+	"github.com/mandelsoft/kubecrtutils/health"
 	"github.com/mandelsoft/kubecrtutils/internal"
 	"github.com/mandelsoft/kubecrtutils/mapping"
 	"github.com/mandelsoft/kubecrtutils/objutils"
@@ -61,6 +62,8 @@ type IndexerFactory[T client.Object] = cacheindex.TypedIndexerFactory[T]
 type CompositionInterface[P kubecrtutils.ObjectPointer[T], T any] interface {
 	TypedDefinition[P, T]
 
+	health.CompositionInterface[CompositionInterface[P, T], Controller]
+
 	WithFinalizer(string) CompositionInterface[P, T]
 	WithPredicates(preds ...predicate.Predicate) CompositionInterface[P, T]
 	// WithActivationConstraint declares additional activation rules
@@ -90,6 +93,8 @@ type _definition[P kubecrtutils.ObjectPointer[T], T any] struct {
 	internal.Element
 	internal.ErrorContainer
 	mapping.DefaultConsumer
+	*health.HealthHandlers[CompositionInterface[P, T], Controller]
+
 	predicates  []predicate.Predicate
 	cluster     string
 	proto       client.Object
@@ -123,6 +128,7 @@ func Define[P kubecrtutils.ObjectPointer[T], T any](name string, cluster string,
 		constraints:     constraints.New(),
 	}
 	d.UseCluster(cluster)
+	d.HealthHandlers = health.NewHealthHandlers[CompositionInterface[P, T], types.Controller](d)
 	return d
 }
 
@@ -413,6 +419,11 @@ func (d *_definition[P, T]) Apply(ctx context.Context, m mapping.ControllerMappi
 		finalizer:         finalizer,
 	}
 	err = mgr.GetControllers().Add(controller)
+	if err != nil {
+		return err
+	}
+
+	err = d.HealthHandlers.ApplyHealthChecks(d.GetName(), controller, mgr)
 	if err != nil {
 		return err
 	}

@@ -5,10 +5,12 @@ import (
 	"crypto/tls"
 
 	"github.com/mandelsoft/flagutils"
+	"github.com/mandelsoft/kubecrtutils/options/manageropts"
 	"github.com/mandelsoft/kubecrtutils/options/tlsopts"
 	"github.com/mandelsoft/kubecrtutils/setup"
 	"github.com/spf13/pflag"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	ctrl "sigs.k8s.io/multicluster-runtime"
 )
 
 type Options struct {
@@ -30,6 +32,8 @@ var (
 func New() *Options {
 	return &Options{}
 }
+
+var _ manageropts.ConfigurationProvider = (*Options)(nil)
 
 func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.webhookCertPath, "webhook-cert-path", "", "The directory that contains the webhook certificate.")
@@ -72,4 +76,9 @@ func (o *Options) GetServer() webhook.Server {
 	}
 
 	return o.webhookServer
+}
+
+func (o *Options) Configure(ctx context.Context, config *ctrl.Options, opts flagutils.OptionSet) error {
+	config.WebhookServer = o.GetServer()
+	return nil
 }

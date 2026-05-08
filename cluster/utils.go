@@ -221,43 +221,52 @@ func ClientSideApply(c Cluster, ctx OperationContext, manifest []byte, mod ...*M
 		return nil, err
 	}
 
-	tmp, err := m.MergeObservingManagedFields(&current, &desired)
-	if err != nil {
-		return nil, err
-	}
+	var patchData []byte
+	if true {
+		patchData, err = m.ComputeSSAPatch(&current, &desired)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		tmp, err := m.MergeObservingManagedFields(&current, &desired)
+		if err != nil {
+			return nil, err
+		}
 
-	// PATH B: Patch existing object
-	// We use 'current' as the base. We only want to update the 'spec' (or other non-system fields).
-	// IMPORTANT: To preserve status/finalizers, we ensure they aren't overwritten in 'desired'.
+		// PATH B: Patch existing object
+		// We use 'current' as the base. We only want to update the 'spec' (or other non-system fields).
+		// IMPORTANT: To preserve status/finalizers, we ensure they aren't overwritten in 'desired'.
 
-	// Create a patch object that calculates the diff between 'current' and 'desired'
-	patch := client.MergeFrom(current.DeepCopy())
+		// Create a patch object that calculates the diff between 'current' and 'desired'
+		patch := client.MergeFrom(current.DeepCopy())
 
-	// Apply the patch to 'current' using our 'desired' state
-	// Note: We update 'current' with 'desired' fields here
+		// Apply the patch to 'current' using our 'desired' state
+		// Note: We update 'current' with 'desired' fields here
 
-	for k, v := range tmp.Object {
-		if k != "metadata" {
-			current.Object[k] = v
+		for k, v := range tmp.Object {
+			if k != "metadata" {
+				current.Object[k] = v
+			}
+		}
+		for k, v := range desired.GetAnnotations() {
+			objutils.SetAnnotation(&current, k, v)
+		}
+		current.SetLabels(desired.GetLabels())
+
+		patchData, err = patch.Data(&current)
+		if err != nil {
+			return nil, err
 		}
 	}
-	for k, v := range desired.GetAnnotations() {
-		objutils.SetAnnotation(&current, k, v)
-	}
-	current.SetLabels(desired.GetLabels())
 
-	patchData, err := patch.Data(&current)
-	if err != nil {
-		return nil, err
-	}
-
-	rawPatch := client.RawPatch(apimachtypes.MergePatchType, patchData)
 	if string(patchData) == "{}" {
 		ctx.Info("resource {{groupkind}} {{namespace}}/{{name}} in {{cluster}} uptodate", "cluster", c.GetName(), "name", desired.GetName(), "namespace", desired.GetNamespace(), "groupkind", desired.GroupVersionKind())
 
 		return &desired, nil // No changes, exit early
 	}
+	rawPatch := client.RawPatch(apimachtypes.MergePatchType, patchData)
 	general.Optional(mod...).SetUpdated()
+	fmt.Printf("intended: %s\n", string(manifest))
 	ctx.Info("apply patch for resource {{groupkind}} {{namespace}}/{{name}} in {{cluster}}", "cluster", c.GetName(), "name", desired.GetName(), "namespace", desired.GetNamespace(), "groupkind", desired.GroupVersionKind(), "patch", string(patchData))
 	return &desired, c.Patch(ctx, &current, rawPatch, &client.PatchOptions{
 		FieldManager: ctx.GetFieldManager(),
@@ -350,7 +359,7 @@ func CreatePatchData(c cluster.Cluster, desired, current *unstructured.Unstructu
 	// IMPORTANT: To preserve status/finalizers, we ensure they aren't overwritten in 'desired'.
 
 	// Create a patch object that calculates the diff between 'current' and 'desired'
-	patch := client.MergeFrom(current.DeepCopyObject().(client.Object))
+	patch := client.StrategicMergeFrom(current.DeepCopyObject().(client.Object))
 
 	// Apply the patch to 'current' using our 'desired' state
 	// Note: We update 'current' with 'desired' fields here

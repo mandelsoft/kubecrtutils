@@ -3,6 +3,7 @@ module github.com/mandelsoft/kubecrtutils
 go 1.25.0
 
 require (
+	github.com/evanphx/json-patch v5.6.0+incompatible
 	github.com/go-logr/logr v1.4.3
 	github.com/go-test/deep v1.1.1
 	github.com/google/cel-go v0.26.0
@@ -10,7 +11,7 @@ require (
 	github.com/kcp-dev/multicluster-provider v0.5.0
 	github.com/kcp-dev/sdk v0.30.0
 	github.com/mandelsoft/flagutils v0.0.0-20260501194609-8a50fcdc8aa7
-	github.com/mandelsoft/goutils v0.0.0-20260419151859-e28bee9b7032
+	github.com/mandelsoft/goutils v0.0.0-20260507153918-c39bb4bb4b7b
 	github.com/mandelsoft/kubedns v0.0.0-00010101000000-000000000000
 	github.com/mandelsoft/logging v0.0.0-20260220094735-62d1006ceeb4
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee
@@ -68,6 +69,7 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_golang v1.23.2 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect

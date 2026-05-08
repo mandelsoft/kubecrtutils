@@ -26,6 +26,7 @@ import (
 )
 
 func NewControllerManagerByOpts(ctx context.Context, opts flagutils.OptionSetProvider) (ControllerManager, error) {
+	ctx, cancel := context.WithCancel(ctx)
 	ctx = generics.WithValue(ctx, opts)
 	def := From(opts)
 	if def == nil {
@@ -88,6 +89,7 @@ func NewControllerManagerByOpts(ctx context.Context, opts flagutils.OptionSetPro
 	}
 
 	cm := &_controllermanager{
+		cancel:     cancel,
 		Element:    internal.NewElement(def.GetName()),
 		logger:     logger,
 		clusters:   clusters,
@@ -159,6 +161,7 @@ func GetData[K comparable, T any](mgr ControllerManager, k K, c func() T) T {
 
 type _controllermanager struct {
 	internal.Element
+	cancel      context.CancelFunc
 	logger      logging.Logger
 	main        cluster.Cluster
 	manager     mcctrl.Manager
@@ -170,6 +173,10 @@ type _controllermanager struct {
 
 	lock sync.Mutex
 	data map[any]any
+}
+
+func (cm *_controllermanager) Cancel() {
+	cm.cancel()
 }
 
 func (cm *_controllermanager) GetData(k any, c func() any) any {

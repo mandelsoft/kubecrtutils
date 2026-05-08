@@ -4,11 +4,13 @@ import (
 	"context"
 
 	"github.com/mandelsoft/flagutils"
+	"github.com/mandelsoft/kubecrtutils/options/manageropts"
 	"github.com/mandelsoft/kubecrtutils/options/tlsopts"
 	"github.com/mandelsoft/kubecrtutils/setup"
 	"github.com/spf13/pflag"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	ctrl "sigs.k8s.io/multicluster-runtime"
 )
 
 type Options struct {
@@ -18,6 +20,8 @@ type Options struct {
 
 	tlsOpts *tlsopts.Options
 }
+
+var _ manageropts.ConfigurationProvider = (*Options)(nil)
 
 func From(opts flagutils.OptionSetProvider) *Options {
 	return flagutils.GetFrom[*Options](opts)
@@ -90,4 +94,9 @@ func (o *Options) GetMetricsServerOpts() metricsserver.Options {
 		metricsServerOptions.KeyName = o.MetricsCertKey
 	}
 	return metricsServerOptions
+}
+
+func (o *Options) Configure(ctx context.Context, config *ctrl.Options, opts flagutils.OptionSet) error {
+	config.Metrics = o.GetMetricsServerOpts()
+	return nil
 }

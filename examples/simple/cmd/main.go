@@ -9,6 +9,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/examples/simple/controllers"
 	"github.com/mandelsoft/kubecrtutils/examples/simple/controllers/replicate"
 	"github.com/mandelsoft/kubecrtutils/options/activationopts"
+	"github.com/mandelsoft/kubecrtutils/options/healthzopts"
 	"github.com/mandelsoft/kubecrtutils/options/metricsopts"
 	"github.com/mandelsoft/kubecrtutils/options/mlogopts"
 	"github.com/mandelsoft/kubecrtutils/options/workeropts"
@@ -56,10 +57,16 @@ func main() {
 	options := &flagutils.DefaultOptionSet{}
 
 	options.Add(
+		// controller manager configuration
 		metricsopts.New(),    // options to control the manager metrics service
-		mlogopts.New(true),   // options to control mandelsoft/logging
+		healthzopts.New(),    // options to control the healthz server (liveness and readiness probe)
 		activationopts.New(), // enable controller selection
 		workeropts.New(),     // enable queue worker configuration
+
+		// application configuration
+		mlogopts.New(true), // options to control mandelsoft/logging
+		// note: options used by components and controllers are defined by their definition objects
+
 		// other options
 	)
 	// --- end orchestrate general functionality ---

@@ -64,6 +64,13 @@ func New(t types.FleetType, name, id string, cfg *rest.Config, endpointSliceName
 	return f, nil
 }
 
+func (k *Fleet) WaitForCacheSync(ctx context.Context) bool {
+	if !k.GetBaseCluster().GetCache().WaitForCacheSync(ctx) {
+		return false
+	}
+	return true
+}
+
 func (k *Fleet) GetCluster(name string) types.Cluster {
 	f, n := fpi.Split(name)
 	if f != k.GetName() && f != "" {

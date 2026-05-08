@@ -13,7 +13,8 @@ type ComponentImplementation = types.ComponentImplementation
 type _component struct {
 	logging.Logger
 
-	def Definition
+	tname string
+	def   Definition
 
 	impl     ComponentImplementation
 	clusters cluster.Clusters
@@ -22,7 +23,7 @@ type _component struct {
 }
 
 func (c *_component) GetName() string {
-	return c.def.GetName()
+	return c.tname
 }
 
 func (c *_component) GetDefinition() Definition {

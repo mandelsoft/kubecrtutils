@@ -11,6 +11,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/cacheindex"
 	"github.com/mandelsoft/kubecrtutils/cacheindex/idxutils"
 	"github.com/mandelsoft/kubecrtutils/controller/constraints"
+	"github.com/mandelsoft/kubecrtutils/health"
 	"github.com/mandelsoft/kubecrtutils/internal"
 	"github.com/mandelsoft/kubecrtutils/mapping"
 	"github.com/mandelsoft/kubecrtutils/types"
@@ -43,12 +44,16 @@ type Definition = interface {
 	types.Applyable
 
 	GetOptions() flagutils.Options
+
+	health.Definition[Component]
 }
 
 // --- begin definition ---
 
 type CompositionInterface interface {
 	Definition
+	health.CompositionInterface[CompositionInterface, Component]
+
 	UseCluster(name ...string) CompositionInterface
 	UseComponent(name ...string) CompositionInterface
 	WithActivationConstraint(constraints ...constraints.Constraint) CompositionInterface
@@ -62,6 +67,8 @@ type _definition struct {
 	internal.Element
 	internal.ErrorContainer
 	mapping.DefaultConsumer
+	*health.HealthHandlers[CompositionInterface, Component]
+
 	constraints constraints.Constraints
 	foreign     cacheindex.Definitions
 	imports     cacheindex.Definitions
@@ -72,7 +79,7 @@ type _definition struct {
 var _ CompositionInterface = (*_definition)(nil)
 
 func Define(name string, fac Factory) *_definition {
-	return &_definition{
+	d := &_definition{
 		Element:         internal.NewElement(name),
 		ErrorContainer:  *internal.NewErrorContainer(fmt.Sprintf("component %s", name)),
 		DefaultConsumer: *mapping.NewDefaultConsumer(),
@@ -81,6 +88,8 @@ func Define(name string, fac Factory) *_definition {
 		imports:         cacheindex.NewDefinitions(),
 		factory:         fac,
 	}
+	d.HealthHandlers = health.NewHealthHandlers[CompositionInterface, Component](d)
+	return d
 }
 
 func (d *_definition) UseCluster(name ...string) CompositionInterface {
@@ -195,10 +204,11 @@ func (d *_definition) CreateIndices(ctx context.Context, mappings mapping.Contro
 }
 
 func (d *_definition) Apply(ctx context.Context, m mapping.ControllerMappings, mgr types.ControllerManager) error {
-	logger := mgr.GetLogger().WithName(d.GetName()).WithValues("component", d.GetName())
-	logger.Info("- configure component {{component}}", "component", d.GetName())
-
 	m = mapping.DefaultMappings(m)
+	tname := m.ComponentMappings().Map(d.GetName())
+	logger := mgr.GetLogger().WithName(d.GetName()).WithValues("component", d.GetName())
+	logger.Info("- configure component {{component}}->{{global}}", "component", d.GetName(), "global", tname)
+
 	clusters, err := mgr.GetClusters().Map(m.ClusterMappings(), d.GetClusters())
 	if err != nil {
 		return err
@@ -216,6 +226,7 @@ func (d *_definition) Apply(ctx context.Context, m mapping.ControllerMappings, m
 
 	b := &_component{
 		Logger:   logger,
+		tname:    tname,
 		def:      d,
 		clusters: clusters,
 		comps:    comps,
@@ -227,6 +238,10 @@ func (d *_definition) Apply(ctx context.Context, m mapping.ControllerMappings, m
 	}
 	b.impl = c
 	err = mgr.GetComponents().Add(b)
+	if err != nil {
+		return err
+	}
+	err = d.HealthHandlers.ApplyHealthChecks(tname, b, mgr)
 	if err != nil {
 		return err
 	}

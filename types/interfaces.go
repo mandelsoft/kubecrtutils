@@ -47,3 +47,7 @@ type ObjectModifierFunc func(cluster Cluster, obj client.Object) error
 func (f ObjectModifierFunc) Modify(cluster Cluster, obj client.Object) error {
 	return f(cluster, obj)
 }
+
+type HealthDefinition[T any] interface {
+	ApplyHealthChecks(basename string, c T, mgr ControllerManager) error
+}

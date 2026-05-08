@@ -114,3 +114,5 @@ this interface and calls it on all found options to apply additional configurati
 
 Avaiulable options provided by the library:
 - `metricsopts`: Options to enable the metrics server for the controller manager (uses `tlsopts`)
+- `healthzopts`: Options to enable the health server for the controller manager (liveness and readiness probe)
+- `webhookopts`: Options to configure the webhook server for the controller manager
