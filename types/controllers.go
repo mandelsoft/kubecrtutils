@@ -5,9 +5,7 @@ import (
 
 	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/kubecrtutils/internal"
-	"github.com/mandelsoft/kubecrtutils/mapping"
 	"github.com/mandelsoft/kubecrtutils/types/plain"
-	"github.com/mandelsoft/logging"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -27,31 +25,13 @@ type ControllerSource interface {
 }
 
 type ControllerDefinition interface {
-	flagutils.Options
+	ComponentDefinition
 
-	GetName() string
-
-	GetActivationConstraints() Constraints
 	GetCluster() string
-	GetClusters() ClusterNames
-	GetComponents() ComponentNames
 	GetResource() client.Object
 	GetGroups() NameSet
 	GetWatchPredicates() []predicate.Predicate
 	GetFinalizer() string
-
-	GetForeignIndices() IndexDefinitions
-
-	GetRequiredClusters(mappings mapping.ControllerMappings) ClusterNames
-	GetRequiredComponents(mappings mapping.ControllerMappings) ComponentNames
-
-	GetError() error
-	GetOptions() flagutils.Options
-
-	IndexProvider
-	Applyable
-
-	HealthDefinition[Controller]
 }
 
 type ControllerDefinitions interface {
@@ -71,23 +51,15 @@ type ControllerDefinitions interface {
 // --- begin controller ---
 
 type Controller interface {
-	GetName() string
-	GetOptions() flagutils.Options
+	Component
+
+	GetMainCluster() ClusterEquivalent
 	GetFieldManager() string
 	GetFinalizer() string
-	GetLogger() logging.Logger
-	GetClusterMappings() mapping.Mappings
-	GetClusters() Clusters
-	GetComponents() Components
-	GetIndices() Indices
-	GetCluster() ClusterEquivalent
-	GetLogicalCluster(name string) ClusterEquivalent
 	GetResource() client.Object
 	GetGroupKind() schema.GroupKind
-	GetControllerManager() ControllerManager
 	GetRecoder(ctx context.Context) record.EventRecorder
 	GetReconciler() reconcile.Reconciler
-	GetIndex(name string) Index
 	GetOwnerHandler() OwnerHandler
 
 	Complete(ctx context.Context) error

@@ -12,6 +12,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/cacheindex"
 	"github.com/mandelsoft/kubecrtutils/cluster"
 	"github.com/mandelsoft/kubecrtutils/cluster/clustercontext"
+	"github.com/mandelsoft/kubecrtutils/component"
 	abuilder "github.com/mandelsoft/kubecrtutils/controller/builder"
 	. "github.com/mandelsoft/kubecrtutils/log"
 	"github.com/mandelsoft/kubecrtutils/mapping"
@@ -41,6 +42,26 @@ type FinalizerModifier interface {
 	ModifyFinalizer(s string) string
 }
 
+type Implementation interface {
+	component.Implementation
+	GetReconciler() reconcile.Reconciler
+}
+
+var _ Implementation = (*_implementation)(nil)
+
+type _implementation struct {
+	component  component.Component
+	reconciler reconcile.Reconciler
+}
+
+func (i *_implementation) GetComponent() component.Component {
+	return i.component
+}
+
+func (i *_implementation) GetReconciler() reconcile.Reconciler {
+	return i.reconciler
+}
+
 type _controller[P kubecrtutils.ObjectPointer[T], T any] struct {
 	enforceNameExtension bool
 	controllerManager    types.ControllerManager
@@ -54,7 +75,7 @@ type _controller[P kubecrtutils.ObjectPointer[T], T any] struct {
 	recorder             recorderFunc
 	localIndices         map[string]cacheindex.TypedIndex[T]
 	indices              cacheindex.Indices
-	reconciler           reconcile.Reconciler
+	impl                 *_implementation
 	ohandler             owner.Handler
 	finalizer            string
 }
@@ -117,11 +138,11 @@ func (c *_controller[P, T]) GetDefinition() TypedDefinition[P, T] {
 	return c.definition
 }
 
-func (c *_controller[P, T]) GetCluster() types.ClusterEquivalent {
+func (c *_controller[P, T]) GetMainCluster() types.ClusterEquivalent {
 	return c.cluster
 }
 
-func (c *_controller[P, T]) GetLogicalCluster(name string) types.ClusterEquivalent {
+func (c *_controller[P, T]) GetCluster(name string) types.ClusterEquivalent {
 	return c.clusters.Get(name)
 }
 
@@ -134,16 +155,24 @@ func (c *_controller[P, T]) GetLocalIndex(name string) cacheindex.TypedIndex[T] 
 	return i
 }
 
+func (c *_controller[P, T]) GetComponent(name string) types.Component {
+	return c.components.Get(name)
+}
+
 func (c *_controller[P, T]) GetIndex(name string) cluster.Index {
 	return c.indices.Get(name)
 }
 
 func (c *_controller[P, T]) GetReconciler() reconcile.Reconciler {
-	return c.reconciler
+	return c.impl.GetReconciler()
+}
+
+func (c *_controller[P, T]) GetImplementation() component.Implementation {
+	return c.impl
 }
 
 func (c *_controller[P, T]) Complete(ctx context.Context) error {
-	cl := c.GetCluster()
+	cl := c.GetMainCluster()
 	d := c.definition
 
 	mgr := c.GetControllerManager()
@@ -153,7 +182,7 @@ func (c *_controller[P, T]) Complete(ctx context.Context) error {
 
 	bldr := multiclusterruntime.NewControllerManagedBy(mgr.GetManager()).Named(d.GetName())
 
-	Info(logger, "  configure reconciling of ", GroupKind(c.gk), " at ", LogicalClusterInfo(c.GetCluster()))
+	Info(logger, "  configure reconciling of ", GroupKind(c.gk), " at ", LogicalClusterInfo(c.GetMainCluster()))
 
 	var set = generics.FromContext[flagutils.OptionSetProvider](ctx)
 	var opts controller.TypedOptions[mcreconcile.Request]
@@ -164,21 +193,21 @@ func (c *_controller[P, T]) Complete(ctx context.Context) error {
 			return errors.Wrapf(err, "configuration provider for controller %s", c.GetName())
 		}
 	}
-	bldr = bldr.For(d.GetResource(), mcbuilder.WithPredicates(d.GetWatchPredicates()...), mcbuilder.WithClusterFilter(c.GetCluster().Filter)).WithOptions(opts)
+	bldr = bldr.For(d.GetResource(), mcbuilder.WithPredicates(d.GetWatchPredicates()...), mcbuilder.WithClusterFilter(c.GetMainCluster().Filter)).WithOptions(opts)
 
 	trigger, err := cl.TriggerSource(d.GetResource())
 	if err != nil {
 		return fmt.Errorf("explicit trigger [%s]: %w", c.gk, err)
 	}
-	Info(logger, "  configure explicit trigger for main resource ", GroupKind(c.gk), " at ", LogicalClusterInfo(c.GetCluster()))
+	Info(logger, "  configure explicit trigger for main resource ", GroupKind(c.gk), " at ", LogicalClusterInfo(c.GetMainCluster()))
 	bldr.WatchesRawSource(trigger)
 
 	logger.Info("  configure reconciler")
-	r, err := d.GetReconciler().CreateReconciler(ctx, c, abuilder.For(bldr, c.GetCluster()))
+	r, err := d.GetReconciler().CreateReconciler(ctx, c, abuilder.For(bldr, c.GetMainCluster()))
 	if err != nil {
 		return err
 	}
-	c.reconciler = r
+	c.impl = &_implementation{c, r}
 
 	for _, t := range d.GetTriggers() {
 		err := c.addTrigger(ctx, bldr, t)
@@ -195,7 +224,7 @@ func (c *_controller[P, T]) Complete(ctx context.Context) error {
 }
 
 func (c *_controller[P, T]) addTrigger(ctx context.Context, bldr *mcbuilder.Builder, tdef ResourceTriggerDefinition) error {
-	gk, err := objutils.GKForObject(c.GetCluster(), tdef.GetResource())
+	gk, err := objutils.GKForObject(c.GetMainCluster(), tdef.GetResource())
 	if err != nil {
 		return fmt.Errorf("cannot determine group kind for %T: %w", tdef.GetResource(), err)
 	}

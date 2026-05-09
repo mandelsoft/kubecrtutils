@@ -6,6 +6,8 @@ import (
 	"github.com/mandelsoft/kubecrtutils/types"
 )
 
+type Probe = func(req *http.Request) error
+
 type Definition[T any] interface {
 	types.HealthDefinition[T]
 }
@@ -16,45 +18,48 @@ type CompositionInterface[D, T any] interface {
 }
 
 type Factory[T any] interface {
-	CreateHealthHandler(T) func(req *http.Request) error
+	CreateHealthHandler(T) Probe
 }
 
-type FactoryFunc[T any] func(e T) func(req *http.Request) error
+type FactoryFunc[T any] func(e T) Probe
 
-func (f FactoryFunc[T]) CreateHealthHandler(e T) func(req *http.Request) error {
+func (f FactoryFunc[T]) CreateHealthHandler(e T) Probe {
 	return f(e)
 }
 
-type HealthHandlers[D, T any] struct {
+// HealthHandlers handles the definition of health handler for a type
+// S, which is a subtype of T. T is used for requesting
+// applying the probes.
+type HealthHandlers[D, S, T any] struct {
 	self      D
 	readiness map[string]Factory[T]
 	liveness  map[string]Factory[T]
 }
 
 var (
-	_ Definition[any]                = (*HealthHandlers[any, any])(nil)
-	_ CompositionInterface[any, any] = (*HealthHandlers[any, any])(nil)
+	_ Definition[any]                = (*HealthHandlers[any, any, any])(nil)
+	_ CompositionInterface[any, any] = (*HealthHandlers[any, any, any])(nil)
 )
 
-func NewHealthHandlers[D, T any](self D) *HealthHandlers[D, T] {
-	return &HealthHandlers[D, T]{
+func NewHealthHandlers[D, S, T any](self D) *HealthHandlers[D, S, T] {
+	return &HealthHandlers[D, S, T]{
 		self:      self,
 		readiness: make(map[string]Factory[T]),
 		liveness:  make(map[string]Factory[T]),
 	}
 }
 
-func (h *HealthHandlers[D, T]) AddReadiness(name string, factory Factory[T]) D {
-	h.readiness[name] = factory
+func (h *HealthHandlers[D, S, T]) AddReadiness(name string, factory Factory[S]) D {
+	h.readiness[name] = Convert[T](factory)
 	return h.self
 }
 
-func (h *HealthHandlers[D, T]) AddLiveness(name string, factory Factory[T]) D {
-	h.liveness[name] = factory
+func (h *HealthHandlers[D, S, T]) AddLiveness(name string, factory Factory[S]) D {
+	h.liveness[name] = Convert[T](factory)
 	return h.self
 }
 
-func (h *HealthHandlers[D, T]) ApplyHealthChecks(basename string, c T, mgr types.ControllerManager) error {
+func (h *HealthHandlers[D, S, T]) ApplyHealthChecks(basename string, c T, mgr types.ControllerManager) error {
 	m := mgr.GetManager()
 	for name, factory := range h.readiness {
 		err := m.AddReadyzCheck(basename+"."+name, factory.CreateHealthHandler(c))

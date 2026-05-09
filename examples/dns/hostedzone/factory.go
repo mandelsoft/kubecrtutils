@@ -21,8 +21,8 @@ func (f *ReconcilerFactory) CreateReconciler(ctx context.Context, controller con
 
 	r := &Reconciler{
 		controller: controller,
-		Runtime:    controller.GetLogicalCluster("runtime"),
-		Dataplane:  controller.GetLogicalCluster("dataplane"),
+		Runtime:    controller.GetCluster("runtime"),
+		Dataplane:  controller.GetCluster("dataplane"),
 	}
 
 	return reconciler.CRTReconcilerFor(controller, r, 300*time.Second), nil

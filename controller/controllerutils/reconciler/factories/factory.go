@@ -89,7 +89,7 @@ func (f *ReconcilerFactory[O, S, P, T]) CreateReconciler(ctx context.Context, co
 		}
 	}
 
-	gvks, _, err := controller.GetCluster().GetScheme().ObjectKinds(controller.GetResource())
+	gvks, _, err := controller.GetMainCluster().GetScheme().ObjectKinds(controller.GetResource())
 	if err != nil {
 		return nil, err
 	}
@@ -97,11 +97,11 @@ func (f *ReconcilerFactory[O, S, P, T]) CreateReconciler(ctx context.Context, co
 	var oh owner.Handler
 	if !reflect2.IsNil(f.Options) {
 		if p, ok := any(f.Options).(owner.HandlerProvider); ok {
-			oh = p.GetOwnerHandler(controller.GetCluster())
+			oh = p.GetOwnerHandler(controller.GetMainCluster())
 		}
 	}
 	if oh == nil {
-		oh = owner.NewHandler(controller.GetCluster())
+		oh = owner.NewHandler(controller.GetMainCluster())
 	}
 
 	r := &Reconciler[O, S, P, T]{
@@ -118,7 +118,7 @@ func (f *ReconcilerFactory[O, S, P, T]) CreateReconciler(ctx context.Context, co
 		Settings:     set,
 		request:      f.reqfactory,
 	}
-	r.Info("  using main {{ctype}} {{cluster}}[{{info}}]", "ctype", controller.GetCluster().GetTypeInfo(), "cluster", controller.GetCluster().GetName(), "info", controller.GetCluster().GetInfo())
+	r.Info("  using main {{ctype}} {{cluster}}[{{info}}]", "ctype", controller.GetMainCluster().GetTypeInfo(), "cluster", controller.GetMainCluster().GetName(), "info", controller.GetMainCluster().GetInfo())
 	return reconciler.CRTReconcilerFor[P](controller, r, 0), nil
 }
 

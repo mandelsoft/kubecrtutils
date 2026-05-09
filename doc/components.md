@@ -16,7 +16,7 @@ Components can be defined with the following functions:
   ```go
   
   type Factory interface {
-  	CreateComponent(ctx context.Context, comp Component) (ComponentImplementation, error)
+  	CreateComponent(ctx context.Context, comp Component) (Implementation, error)
   }
   
   ```
@@ -49,16 +49,18 @@ The component has the following interface:
 ```go
 
 type Component interface {
-	logging.Logger
-
 	GetName() string
+	GetLogger() logging.Logger
+	GetOptions() flagutils.Options
+	GetClusterMappings() mapping.Mappings
 
-	GetCluster(name string) ClusterEquivalent
-	GetComponent(name string) Component
-	GetIndex(name string) Index
-
+	GetControllerManager() ControllerManager
 	GetIndices() Indices
+	GetIndex(name string) Index
 	GetClusters() Clusters
+	GetCluster(name string) ClusterEquivalent
+	GetComponents() Components
+	GetComponent(name string) Component
 
 	GetImplementation() ComponentImplementation
 }

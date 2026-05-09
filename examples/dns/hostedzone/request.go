@@ -47,7 +47,7 @@ func (r *ReconcileRequest) Reconcile() reconcile.Problem {
 	{
 		r.Info("technical index implementation for {{name}}", "name", r.Name)
 		var list v1alpha1.HostedZoneList
-		p := r.Reconciler.controller.GetCluster().AsFleet().(*kcp.Fleet).GetKCPProvider()
+		p := r.Reconciler.controller.GetMainCluster().AsFleet().(*kcp.Fleet).GetKCPProvider()
 		for n, pp := range p.Providers {
 			r.Info("lookup shard {{shard}}", "shard", n)
 			c := pp.GetCache()
@@ -72,7 +72,7 @@ func (r *ReconcileRequest) Reconcile() reconcile.Problem {
 		r.Error("cannot get secret", "error", err)
 	}
 
-	err = r.GetController().GetLogicalCluster("runtime").Get(r.Context, client.ObjectKey{Namespace: ns, Name: "dns-service"}, &secret)
+	err = r.GetController().GetCluster("runtime").Get(r.Context, client.ObjectKey{Namespace: ns, Name: "dns-service"}, &secret)
 	if err == nil {
 		r.Info("kubeconfig", "cert", string(secret.Data["KubeConfig"]))
 	} else {

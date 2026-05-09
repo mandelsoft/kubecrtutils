@@ -46,6 +46,8 @@ The complete interface is as follows:
  type CompositionInterface[P kubecrtutils.ObjectPointer[T], T any] interface {
  	TypedDefinition[P, T]
  
+ 	health.CompositionInterface[CompositionInterface[P, T], Controller]
+ 
  	WithFinalizer(string) CompositionInterface[P, T]
  	WithPredicates(preds ...predicate.Predicate) CompositionInterface[P, T]
  	// WithActivationConstraint declares additional activation rules
@@ -84,23 +86,15 @@ The controller has the following interface:
 ```go
 
 type Controller interface {
-	GetName() string
-	GetOptions() flagutils.Options
+	Component
+
+	GetMainCluster() ClusterEquivalent
 	GetFieldManager() string
 	GetFinalizer() string
-	GetLogger() logging.Logger
-	GetClusterMappings() mapping.Mappings
-	GetClusters() Clusters
-	GetComponents() Components
-	GetIndices() Indices
-	GetCluster() ClusterEquivalent
-	GetLogicalCluster(name string) ClusterEquivalent
 	GetResource() client.Object
 	GetGroupKind() schema.GroupKind
-	GetControllerManager() ControllerManager
 	GetRecoder(ctx context.Context) record.EventRecorder
 	GetReconciler() reconcile.Reconciler
-	GetIndex(name string) Index
 	GetOwnerHandler() OwnerHandler
 
 	Complete(ctx context.Context) error

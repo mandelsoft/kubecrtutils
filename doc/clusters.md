@@ -88,6 +88,8 @@ type ClusterEquivalent interface {
 	FilterById(clusterId string) bool
 	Match(clusterName string) bool
 	LiftTechnical(clusterName string) (string, Cluster)
+
+	WaitForCacheSync(ctx context.Context) bool
 }
 ```
 

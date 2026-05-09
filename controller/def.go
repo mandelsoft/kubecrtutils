@@ -14,6 +14,7 @@ import (
 	"github.com/mandelsoft/kubecrtutils/cacheindex"
 	"github.com/mandelsoft/kubecrtutils/cacheindex/idxutils"
 	"github.com/mandelsoft/kubecrtutils/cluster/clustercontext"
+	"github.com/mandelsoft/kubecrtutils/component"
 	"github.com/mandelsoft/kubecrtutils/controller/builder"
 	"github.com/mandelsoft/kubecrtutils/controller/constraints"
 	"github.com/mandelsoft/kubecrtutils/health"
@@ -89,11 +90,14 @@ type TypedDefinition[P kubecrtutils.ObjectPointer[T], T any] interface {
 	GetTriggers() []ResourceTriggerDefinition
 }
 
+// controller must be a subtype og Component.
+var _ component.Component = (Controller)(nil)
+
 type _definition[P kubecrtutils.ObjectPointer[T], T any] struct {
 	internal.Element
 	internal.ErrorContainer
 	mapping.DefaultConsumer
-	*health.HealthHandlers[CompositionInterface[P, T], Controller]
+	*health.HealthHandlers[CompositionInterface[P, T], Controller, component.Component]
 
 	predicates  []predicate.Predicate
 	cluster     string
@@ -128,7 +132,7 @@ func Define[P kubecrtutils.ObjectPointer[T], T any](name string, cluster string,
 		constraints:     constraints.New(),
 	}
 	d.UseCluster(cluster)
-	d.HealthHandlers = health.NewHealthHandlers[CompositionInterface[P, T], types.Controller](d)
+	d.HealthHandlers = health.NewHealthHandlers[CompositionInterface[P, T], types.Controller, types.Component](d)
 	return d
 }
 

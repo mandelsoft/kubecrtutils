@@ -23,29 +23,29 @@ import (
 // --- begin factory ---
 
 type Factory interface {
-	CreateComponent(ctx context.Context, comp Component) (ComponentImplementation, error)
+	CreateComponent(ctx context.Context, comp Component) (Implementation, error)
 }
 
 // --- end factory ---
 
 type Definition = interface {
-	flagutils.Options
-	mapping.Consumer
-
-	GetName() string
-
-	GetForeignIndices() cacheindex.Definitions
-	GetActivationConstraints() constraints.Constraints
-
-	GetRequiredClusters(mappings mapping.ControllerMappings) types.ClusterNames
-	GetRequiredComponents(mappings mapping.ControllerMappings) ComponentNames
-
 	types.IndexProvider
 	types.Applyable
 
+	flagutils.Options
+	mapping.Consumer
+	health.Definition[Component]
+
+	GetName() string
 	GetOptions() flagutils.Options
 
-	health.Definition[Component]
+	GetActivationConstraints() constraints.Constraints
+
+	GetForeignIndices() cacheindex.Definitions
+	GetRequiredClusters(mappings mapping.ControllerMappings) types.ClusterNames
+	GetRequiredComponents(mappings mapping.ControllerMappings) ComponentNames
+
+	GetError() error
 }
 
 // --- begin definition ---
@@ -67,7 +67,7 @@ type _definition struct {
 	internal.Element
 	internal.ErrorContainer
 	mapping.DefaultConsumer
-	*health.HealthHandlers[CompositionInterface, Component]
+	*health.HealthHandlers[CompositionInterface, Component, Component]
 
 	constraints constraints.Constraints
 	foreign     cacheindex.Definitions
@@ -88,7 +88,7 @@ func Define(name string, fac Factory) *_definition {
 		imports:         cacheindex.NewDefinitions(),
 		factory:         fac,
 	}
-	d.HealthHandlers = health.NewHealthHandlers[CompositionInterface, Component](d)
+	d.HealthHandlers = health.NewHealthHandlers[CompositionInterface, Component, Component](d)
 	return d
 }
 
@@ -225,12 +225,14 @@ func (d *_definition) Apply(ctx context.Context, m mapping.ControllerMappings, m
 	}
 
 	b := &_component{
-		Logger:   logger,
-		tname:    tname,
-		def:      d,
-		clusters: clusters,
-		comps:    comps,
-		indices:  indices,
+		logger:     logger,
+		mappings:   m.ClusterMappings(),
+		manager:    mgr,
+		tname:      tname,
+		def:        d,
+		clusters:   clusters,
+		components: comps,
+		indices:    indices,
 	}
 	c, err := d.factory.CreateComponent(ctx, b)
 	if err != nil {

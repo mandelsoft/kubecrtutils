@@ -244,10 +244,16 @@ It consists of three very simple delarative-like parts:
    	options := &flagutils.DefaultOptionSet{}
    
    	options.Add(
+   		// controller manager configuration
    		metricsopts.New(),    // options to control the manager metrics service
-   		mlogopts.New(true),   // options to control mandelsoft/logging
+   		healthzopts.New(),    // options to control the healthz server (liveness and readiness probe)
    		activationopts.New(), // enable controller selection
    		workeropts.New(),     // enable queue worker configuration
+   
+   		// application configuration
+   		mlogopts.New(true), // options to control mandelsoft/logging
+   		// note: options used by components and controllers are defined by their definition objects
+   
    		// other options
    	)
    ```
@@ -285,7 +291,7 @@ Usage of replicator:
       --class string                        replication class
       --controllers strings                 activated controllers (replicate, all). (default [all])
       --enable-http2                        If set, HTTP/2 will be enabled for the metrics and webhook servers
-      --health-probe-bind-address string    The address the probe endpoint binds to. (default ":8081")
+      --health-probe-bind-address string    The address the healthz endpoint binds to. (default ":8081")
       --kubeconfig string                   path to standard kubeconfig
       --kubeconfig-context string           context used together with kubeconfig
       --kubeconfig-identity string          identity used together with kubeconfig
@@ -302,9 +308,11 @@ Usage of replicator:
       --source-kubeconfig string            replication source
       --source-kubeconfig-context string    context used together with source-kubeconfig
       --source-kubeconfig-identity string   identity used together with source-kubeconfig
+      --source-redirect string              fallback definition (default "default")
       --target-kubeconfig string            replication target
       --target-kubeconfig-context string    context used together with target-kubeconfig
       --target-kubeconfig-identity string   identity used together with target-kubeconfig
+      --target-redirect string              fallback definition (default "source")
       --workers stringToInt                 workers for controller (default [])
 ```
 

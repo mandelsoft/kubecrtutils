@@ -26,7 +26,7 @@ func ownerMapFuncFactory[T client.Object](owmerproto client.Object, local bool) 
 		if owmerproto == nil {
 			owmerproto = c.GetResource()
 		}
-		gk, err := objutils.GKForObject(c.GetCluster(), owmerproto)
+		gk, err := objutils.GKForObject(c.GetMainCluster(), owmerproto)
 		if err != nil {
 			return nil, err
 		}
@@ -34,12 +34,12 @@ func ownerMapFuncFactory[T client.Object](owmerproto client.Object, local bool) 
 		if local {
 			return func(clusterName string, _ cluster.Cluster) handler.TypedMapFunc[T, mcreconcile.Request] {
 				cl := c.GetControllerManager().MapTechnicalName(clusterName)
-				return owner.MapOwnerToRequestForGK[T](owner.NewHandler(cl), owner.MatcherFor(c.GetCluster()), cl.AsCluster(), gk, log)
+				return owner.MapOwnerToRequestForGK[T](owner.NewHandler(cl), owner.MatcherFor(c.GetMainCluster()), cl.AsCluster(), gk, log)
 			}, nil
 		} else {
 			return func(clusterName string, _ cluster.Cluster) handler.TypedMapFunc[T, mcreconcile.Request] {
 				cl := c.GetControllerManager().MapTechnicalName(clusterName)
-				return owner.MapOwnerToRequestForGK[T](owner.NewHandler(cl), owner.MatcherFor(c.GetCluster()), cl.AsCluster(), gk, log)
+				return owner.MapOwnerToRequestForGK[T](owner.NewHandler(cl), owner.MatcherFor(c.GetMainCluster()), cl.AsCluster(), gk, log)
 			}, nil
 		}
 	}
@@ -56,7 +56,7 @@ func mapOwnersFactory[T client.Object](local bool) ControllerAware[ClusterAware[
 		} else {
 			return func(clusterName string, _ cluster.Cluster) ObjectMapper[T, owner.Owner] {
 				cl := c.GetControllerManager().MapTechnicalName(clusterName)
-				return owner.MapOwners[T](owner.NewHandler(cl), owner.MatcherFor(c.GetCluster()), cl.AsCluster(), log)
+				return owner.MapOwners[T](owner.NewHandler(cl), owner.MatcherFor(c.GetMainCluster()), cl.AsCluster(), log)
 			}, nil
 		}
 	}

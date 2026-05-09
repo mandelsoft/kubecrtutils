@@ -1,6 +1,7 @@
 package types
 
 import (
+	"github.com/mandelsoft/flagutils"
 	"github.com/mandelsoft/kubecrtutils/internal"
 	"github.com/mandelsoft/kubecrtutils/mapping"
 	"github.com/mandelsoft/kubecrtutils/types/plain"
@@ -13,19 +14,41 @@ type ComponentFilter interface {
 	GetUsedComponents(ConstraintContext) ComponentNames
 }
 
+type ComponentDefinition = interface {
+	GetError() error
+
+	IndexProvider
+	Applyable
+
+	flagutils.Options
+	mapping.Consumer
+	HealthDefinition[Component]
+
+	GetName() string
+	GetOptions() flagutils.Options
+
+	GetActivationConstraints() Constraints
+
+	GetForeignIndices() IndexDefinitions
+	GetRequiredClusters(mappings mapping.ControllerMappings) ClusterNames
+	GetRequiredComponents(mappings mapping.ControllerMappings) ComponentNames
+}
+
 // --- begin component ---
 
 type Component interface {
-	logging.Logger
-
 	GetName() string
+	GetLogger() logging.Logger
+	GetOptions() flagutils.Options
+	GetClusterMappings() mapping.Mappings
 
-	GetCluster(name string) ClusterEquivalent
-	GetComponent(name string) Component
-	GetIndex(name string) Index
-
+	GetControllerManager() ControllerManager
 	GetIndices() Indices
+	GetIndex(name string) Index
 	GetClusters() Clusters
+	GetCluster(name string) ClusterEquivalent
+	GetComponents() Components
+	GetComponent(name string) Component
 
 	GetImplementation() ComponentImplementation
 }

@@ -133,7 +133,7 @@ func (r *BaseRequest[T]) GetAfter() time.Duration {
 }
 
 func (r *BaseRequest[T]) GetLogicalCluster(name string) types.ClusterEquivalent {
-	return r.GetController().GetLogicalCluster(name)
+	return r.GetController().GetCluster(name)
 }
 
 func (r *BaseRequest[T]) StatusChanged() bool {
@@ -298,7 +298,7 @@ func CRTReconcilerFor[P kubecrtutils.ObjectPointer[T], T any](c controller.Typed
 	return &crtReconciler[P]{
 		name:       c.GetName(),
 		logger:     c.GetLogger(),
-		cluster:    c.GetCluster(),
+		cluster:    c.GetMainCluster(),
 		controller: c,
 		reconciler: r,
 		after:      general.Optional(after...),
