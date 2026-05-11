@@ -52,7 +52,7 @@ func NewDefinitions() Definitions {
 func (d *_definitions) isUsed(c Definition) (bool, error) {
 	cset := c.GetActivationConstraints()
 	if cset != nil {
-		ok, err := c.GetActivationConstraints().Match(d.cctx)
+		ok, err := cset.Match(d.cctx)
 		if err != nil {
 			return false, err
 		}

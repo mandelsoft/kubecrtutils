@@ -146,7 +146,7 @@ func (r *BaseRequest[T]) StatusChanged() bool {
 	o := reflect.ValueOf(r.Orig).Elem().FieldByName("Status").Interface()
 	diff := deep.Equal(n, o)
 	if len(diff) > 0 {
-		r.Info("status changed", "diff", diff)
+		r.Info("status changed (new <-> old)", "diff", diff)
 		return true
 	}
 	return false

@@ -15,7 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer/yaml"
+	yamlser "k8s.io/apimachinery/pkg/runtime/serializer/yaml"
 	apimachtypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -77,7 +77,7 @@ type Logger interface {
 
 func DeleteObject(c Cluster, ctx OperationContext, manifest []byte) error {
 	obj := unstructured.Unstructured{}
-	dec := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
+	dec := yamlser.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
 	_, _, err := dec.Decode(manifest, nil, &obj)
 	if err != nil {
 		return err
@@ -111,7 +111,7 @@ func ServerSideApply(c Cluster, ctx OperationContext, manifest []byte) error {
 	// 1. Decode the raw bytes into an Unstructured object.
 	// We use Unstructured to avoid needing the Go types for every manifest.
 	obj := &unstructured.Unstructured{}
-	dec := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
+	dec := yamlser.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
 	_, _, err := dec.Decode(manifest, nil, obj)
 	if err != nil {
 		return fmt.Errorf("failed to decode manifest: %w", err)
@@ -175,7 +175,7 @@ func (m *ModificationInfo) Report(recorder record.EventRecorder, typ string, obj
 func ClientSideApply(c Cluster, ctx OperationContext, manifest []byte, mod ...*ModificationInfo) (*unstructured.Unstructured, error) {
 	// 1. Decode bytes into a 'desired' unstructured object
 	desired := unstructured.Unstructured{}
-	dec := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
+	dec := yamlser.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
 	_, _, err := dec.Decode(manifest, nil, &desired)
 	if err != nil {
 		return nil, err
@@ -259,14 +259,17 @@ func ClientSideApply(c Cluster, ctx OperationContext, manifest []byte, mod ...*M
 		}
 	}
 
-	if string(patchData) == "{}" {
+	if string(patchData) == "{}" || len(patchData) == 0 {
 		ctx.Info("resource {{groupkind}} {{namespace}}/{{name}} in {{cluster}} uptodate", "cluster", c.GetName(), "name", desired.GetName(), "namespace", desired.GetNamespace(), "groupkind", desired.GroupVersionKind())
 
 		return &desired, nil // No changes, exit early
 	}
+	// live, _ := yaml.Marshal(&current)
+	// fmt.Printf("*** live:\n%s\n", string(live))
+	// fmt.Printf("*** intended:\n%s\n", string(manifest))
+	// fmt.Printf("*** patch:\n%s\n", string(patchData))
 	rawPatch := client.RawPatch(apimachtypes.MergePatchType, patchData)
 	general.Optional(mod...).SetUpdated()
-	fmt.Printf("intended: %s\n", string(manifest))
 	ctx.Info("apply patch for resource {{groupkind}} {{namespace}}/{{name}} in {{cluster}}", "cluster", c.GetName(), "name", desired.GetName(), "namespace", desired.GetNamespace(), "groupkind", desired.GroupVersionKind(), "patch", string(patchData))
 	return &desired, c.Patch(ctx, &current, rawPatch, &client.PatchOptions{
 		FieldManager: ctx.GetFieldManager(),
