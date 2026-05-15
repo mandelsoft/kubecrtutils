@@ -16,6 +16,52 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+func (m *ObjectMerger) GetRawInfo(converter managedfields.TypeConverter, obj runtime.Object) (*typed.TypedValue, *fieldpath.Set, error) {
+	desiredTyped, err := converter.ObjectToTyped(obj)
+	if err != nil {
+		return nil, nil, fmt.Errorf("converting desired to typed: %w", err)
+	}
+
+	// Compute the new fieldset from desired
+	desiredFields, err := desiredTyped.ToFieldSet()
+	if err != nil {
+		return nil, nil, fmt.Errorf("extracting desired fieldset: %w", err)
+	}
+	return desiredTyped, desiredFields, nil
+}
+
+func (m *ObjectMerger) GetInfo(converter managedfields.TypeConverter, obj runtime.Object) (*typed.TypedValue, *fieldpath.Set, error) {
+	desiredTyped, desiredFields, err := m.GetRawInfo(converter, obj)
+	if err == nil {
+		complete(desiredFields)
+	}
+	return desiredTyped, desiredFields, nil
+}
+
+func (m *ObjectMerger) GetOwnedFields(obj runtime.Object) (*fieldpath.Set, error) {
+	o, ok := obj.(metav1.Object)
+	if !ok {
+		return nil, fmt.Errorf("object does not implement metav1.Object")
+	}
+
+	ownedFields := fieldpath.NewSet()
+	for _, entry := range o.GetManagedFields() {
+		if entry.Manager != m.managerName {
+			continue
+		}
+		fs := &fieldpath.Set{}
+		if err := fs.FromJSON(bytes.NewReader(entry.FieldsV1.Raw)); err != nil {
+			return nil, fmt.Errorf("parsing managed fields: %w", err)
+		}
+		ownedFields = ownedFields.Union(fs)
+	}
+	if m.defaulted != nil {
+		// ignore fields implicitly added by api server
+		return ownedFields.Difference(m.defaulted), nil
+	}
+	return ownedFields, nil
+}
+
 func (m *ObjectMerger) ComputeSSAPatch(
 	live runtime.Object,
 	desired runtime.Object,
@@ -38,37 +84,15 @@ func (m *ObjectMerger) ComputeSSAPatch(
 		return nil, fmt.Errorf("converting live to typed: %w", err)
 	}
 
-	desiredTyped, err := typeConverter.ObjectToTyped(desired)
+	ownedFields, err := m.GetOwnedFields(live)
 	if err != nil {
-		return nil, fmt.Errorf("converting desired to typed: %w", err)
+		return nil, err
 	}
 
-	// 2. Extract the fieldset this manager currently owns from live
-	//    (from .metadata.managedFields)
-	liveObj, ok := live.(metav1.Object)
-	if !ok {
-		return nil, fmt.Errorf("live object does not implement metav1.Object")
-	}
-
-	ownedFields := fieldpath.NewSet()
-	for _, entry := range liveObj.GetManagedFields() {
-		if entry.Manager != m.managerName {
-			continue
-		}
-		fs := &fieldpath.Set{}
-		if err := fs.FromJSON(bytes.NewReader(entry.FieldsV1.Raw)); err != nil {
-			return nil, fmt.Errorf("parsing managed fields: %w", err)
-		}
-		ownedFields = ownedFields.Union(fs)
-	}
-	// fmt.Printf("owned fields: %s\n", ownedFields)
-
-	// Compute the new fieldset from desired
-	desiredFields, err := desiredTyped.ToFieldSet()
+	desiredTyped, desiredFields, err := m.GetInfo(typeConverter, desired)
 	if err != nil {
-		return nil, fmt.Errorf("extracting desired fieldset: %w", err)
+		return nil, err
 	}
-	complete(desiredFields)
 	// fmt.Printf("desired fields: %s\n", desiredFields)
 
 	// Merge desired onto live, scoped to owned fields:

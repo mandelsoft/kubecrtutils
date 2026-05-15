@@ -193,6 +193,9 @@ func Result(log InfoLogger, p Problem, after ...time.Duration) (ctrl.Result, err
 		// Requeue does not reliably work if watch close appears,
 		// so, enforce an error.
 		err = p.Problem()
+		if err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 	return result, err
 }

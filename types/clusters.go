@@ -154,6 +154,8 @@ type Cluster interface {
 	// Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error
 	// List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error
 
+	GetLocalName() string
+
 	WaitForCacheSync(context.Context) bool
 
 	Unwrap() Cluster

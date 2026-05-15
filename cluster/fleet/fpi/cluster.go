@@ -26,6 +26,11 @@ func (c *Cluster) AsCluster() types.Cluster {
 	return c
 }
 
+func (c *Cluster) GetLocalName() string {
+	_, n := Split(c.GetName())
+	return n
+}
+
 func (c *Cluster) EnqueueByGVK(ctx context.Context, gvk schema.GroupVersionKind, key client.ObjectKey) error {
 	return c.fleet.EnqueueByGVK(clustercontext.WithCluster(ctx, c), gvk, key)
 }

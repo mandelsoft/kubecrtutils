@@ -319,12 +319,14 @@ func (d *crtReconciler[T]) Reconcile(ctx context.Context, request reconcile.Requ
 
 	var cl cluster.Cluster
 	var clusterName string
+	var fleetprefix string
 	if d.cluster.AsCluster() != nil {
 		cl = d.cluster.AsCluster()
 		clusterName = cl.GetName()
 	} else {
 		cl = clustercontext.ClusterFor(ctx)
 		clusterName = clustercontext.ClusterNameFor(ctx)
+		fleetprefix = cl.GetLocalName() + "/"
 	}
 
 	cl.WaitForCacheSync(ctx)
@@ -335,7 +337,7 @@ func (d *crtReconciler[T]) Reconcile(ctx context.Context, request reconcile.Requ
 		Cluster:       cl,
 		EventRecorder: cl.GetEventRecorderFor(d.name),
 		OwnerHandler:  d.controller.GetOwnerHandler(),
-		Logger:        d.logger.WithName(request.String()).WithValues("object", request.NamespacedName, "cluster", cl.GetName(), "effcluster", cl.GetEffective().GetName()),
+		Logger:        d.logger.WithName(fleetprefix+request.String()).WithValues("object", request.NamespacedName, "cluster", cl.GetName(), "effcluster", cl.GetEffective().GetName()),
 		Request:       mcreconcile.Request{request, clusterName},
 		After:         d.after,
 	}

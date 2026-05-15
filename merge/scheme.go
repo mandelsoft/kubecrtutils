@@ -10,16 +10,36 @@ import (
 	"k8s.io/client-go/openapi3"
 	"k8s.io/client-go/rest"
 	"k8s.io/kube-openapi/pkg/validation/spec"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 type ObjectMerger struct {
 	converters  Converters
 	scheme      *runtime.Scheme
 	managerName string
+	defaulted   *fieldpath.Set
 }
 
 func NewObjectMerger(c Converters, scheme *runtime.Scheme, managerName string) (*ObjectMerger, error) {
 	return &ObjectMerger{converters: c, managerName: managerName}, nil
+}
+
+func (m *ObjectMerger) WithDefaulted(defaulted *fieldpath.Set) *ObjectMerger {
+	n := *m
+	n.defaulted = defaulted
+	return &n
+}
+
+func (m *ObjectMerger) GetDefaulted() *fieldpath.Set {
+	return m.defaulted
+}
+
+func (m *ObjectMerger) GetScheme() *runtime.Scheme {
+	return m.scheme
+}
+
+func (m *ObjectMerger) GetConverter(gvk schema.GroupVersionKind) (managedfields.TypeConverter, error) {
+	return m.converters.GetConverter(gvk)
 }
 
 func NewConverterV3(config *rest.Config) (managedfields.TypeConverter, error) {

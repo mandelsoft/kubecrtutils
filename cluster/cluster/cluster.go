@@ -123,6 +123,10 @@ func (c *_cluster) GetName() string {
 	return c.name
 }
 
+func (c *_cluster) GetLocalName() string {
+	return c.GetName()
+}
+
 func (c *_cluster) GetInfo() string {
 	return c.GetConfig().Host
 }
